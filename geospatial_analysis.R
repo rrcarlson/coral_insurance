@@ -117,6 +117,7 @@ st_write(bus_200m_Oahu, "/Users/rachelcarlson/Documents/Research/Coral_Insurance
 bus_1k_Oahu <- st_read("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/GAO_CC/bus_1k_Oahu_filled.shp")
 bus_200m_Oahu <- st_read("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/GAO_CC/bus_200m_Oahu_filled.shp")
 
+# For points where GAO is NA for CC, replace NA values with CC values from PacIOOS
 bus_1k_Oahu$ACC_men <- ifelse(is.na(bus_1k_Oahu$ACC_men), bus_1k_Oahu$X_mean*100, bus_1k_Oahu$ACC_men)
 bus_1k_Oahu$ACC_max <- ifelse(is.infinite(bus_1k_Oahu$ACC_max), bus_1k_Oahu$X_max*100, bus_1k_Oahu$ACC_max)
 
@@ -143,14 +144,12 @@ colnames(bus_1k_Oahu)[72] <- "ACC_mean"
 # }
 
 # Kauai
-
 bus_1k_Kauai <- bus_buff_1k %>% filter(island == "Kauai") 
 bus_1k_Kauai <- bus_1k_Kauai %>% mutate(
   ACC_mean = raster::extract(GAO_Kauai_40, bus_1k_Kauai, fun = mean, na.rm = TRUE),
   ACC_max = raster::extract(GAO_Kauai_40, bus_1k_Kauai, fun = max, na.rm = TRUE))
 
 # Maui
-
 bus_1k_Maui <- bus_buff_1k %>% filter(island == "Maui") 
 bus_1k_Maui <- bus_1k_Maui %>% mutate(
   ACC_mean = raster::extract(GAO_Maui_40, bus_1k_Maui, fun = mean, na.rm = TRUE),
