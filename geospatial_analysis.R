@@ -13,11 +13,15 @@ library(ISLR2)
 
 ##### Coral health: Load GAO coral cover data for Oahu and Hawaii Island
 
-GAO_Hawaii <- raster("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/GAO_CC/Hawaii/Hawaii_merged_CC.tif")
-GAO_Oahu <- raster("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/GAO_CC/Oahu/ASU_GAO_Oahu_Percent_Live_Cover_v3.tif")
-GAO_Kauai <- raster("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/GAO_CC/Kauai/ASU_GAO_Kauai_Percent_Live_Cover_v3.tif")
-GAO_Maui <- raster("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/GAO_CC/Maui/ASU_GAO_Maui_Percent_Live_Cover_v3 (1).tif")
+GAO_Hawaii <- raster("/Users/rachelcarlson/Documents/Research/RS_data/islands/Hawaii/Hawaii_merged_CC.tif")
+GAO_Oahu <- raster("/Users/rachelcarlson/Documents/Research/RS_data/islands/Oahu/ASU_GAO_Oahu_Percent_Live_Cover_v3.tif")
+GAO_Kauai <- raster("/Users/rachelcarlson/Documents/Research/RS_data/islands/Kauai/ASU_GAO_Kauai_Percent_Live_Cover_v3.tif")
+GAO_Maui <- raster("/Users/rachelcarlson/Documents/Research/RS_data/islands/Maui/ASU_GAO_Maui_Percent_Live_Cover_v3 (1).tif")
 
+NAvalue(GAO_Hawaii) <- 255
+NAvalue(GAO_Oahu) <- 255
+NAvalue(GAO_Kauai) <- 255
+NAvalue(GAO_Maui) <- 255
 ##### Backup coral health: PacIOOS summed for all species
 
 # List files belonging to individual species
