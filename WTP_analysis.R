@@ -16,9 +16,10 @@ library(Ecdat)
 library(lmtest)
 library(psych)
 library(lme4)
+library(ResourceSelection)
 
 ##### Read in data
-wtp <- read.csv("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/business_wtp.csv")
+wtp <- read.csv("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/business_wtp.csv", stringsAsFactors = TRUE)
 
 ##### Clean data
 # Remove geospatial markers (not needed) and any other uneeded columns
@@ -67,11 +68,34 @@ pairs.panels(wtp_corr,
 
 # No problematic correlations detected
 
+# Convert response variables to factors
+wtp_m1 <- wtp %>% filter(!is.na(BID1.25))
+wtp_m1 <- wtp_m1 %>% filter(!is.na(size_rev))
+
+wtp_m1$BID5 <- as.factor(wtp_m1$BID5)
+wtp_m1$BID2.5 <- as.factor(wtp_m1$BID2.5)
+wtp_m1$BID1.25 <- as.factor(wtp_m1$BID1.25)
+
 # Try a preliminary model
-wtp_m1 <- wtp %>% filter(!is.na(size_rev))
-glm.fits <- glm(BID1.25 ~ econ_1 + econ_2 + pro_soc + pro_nat1 + tenure + size_rev + identity + island, 
+
+glm.fits <- glm(BID5 ~ econ_1 + econ_2 + pro_soc + pro_nat1 + tenure + size_rev + identity + island, 
                 family = binomial,
                 data = wtp_m1)
+
+# Predict outcome based on model coefficients
+glm.probs <- predict(glm.fits, type = "response")
+glm.probs[1:10]
+glm.pred <- rep(0, 174)
+glm.pred[glm.probs > 0.5] = 1
+table(glm.pred, wtp_m1$BID5)
+
+# Perform best subset selection
+
+
+# Use multinomial logistic regression instead, for fun (not used in final analysis)
+
+
+
 
 
 
