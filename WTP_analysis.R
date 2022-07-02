@@ -83,56 +83,139 @@ wtp_m1$BID5 <- as.factor(wtp_m1$BID5)
 wtp_m1$BID2.5 <- as.factor(wtp_m1$BID2.5)
 wtp_m1$BID1.25 <- as.factor(wtp_m1$BID1.25)
 
-# Try a preliminary model
+##### Redefine dataset to include only the variables I am testing
+# Redefine proximity as close or far
+wtp$Close <- ifelse(wtp$prox == "Close" | wtp$prox == "Beachfront", 1, 0)
+# Redefine industry as recreation "surface", recreation "subsurface" or land-based
+wtp$industry2 <- ifelse((wtp$industry1 == "Retail" | wtp$industry1 == "Restaurant" | wtp$industry1 == "Lodging"), "Land", 
+                           ifelse(wtp$industry1 == "Recreation surface", "Recreation surface",
+                                  ifelse(wtp$industry1 == "Recreation subsurface", "Recreation subsurface", 0)))
+# If I want to define "multi" island as inclusive of both Hawaii and Oahu, not a third category
+wtp$islandOahu <- ifelse(wtp$island == "Oahu" | wtp$island == "Multi", 1, 0)
 
-glm.fits <- glm(BID5 ~ econ_1 + econ_2 + pro_soc + pro_nat1 + tenure + size_rev + identity + island, 
-                family = binomial,
-                data = wtp_m1)
+##### Dataset for model
+wtp_ms <- wtp[,c("dist", "res", "identity", "age", "gender", "island", "Close", "CC", "industry2", "size_rev", "tenure", "econ_1", "econ_2.1","pro_nat1","pro_soc", "BID1.25", "BID2.5", "BID5")]
+# wtp_ms$islandHawaii <- ifelse(wtp_ms$island == "Hawaii" | wtp_ms$island == "Multi", 1, 0)
 
-# Predict outcome based on model coefficients
-glm.probs <- predict(glm.fits, type = "response")
-glm.probs[1:10]
-glm.pred <- rep(0, 174)
-glm.pred[glm.probs > 0.5] = 1
-table(glm.pred, wtp_m1$BID5)
-
-##### Perform best subset selection
-# Redefine dataset to include only the variables I am testing
-wtp_ms <- wtp[,c("dist", "res", "identity", "age", "gender", "island", "CC", "industry1", "prox", "size_rev", "tenure", "econ_1", "econ_2.1","pro_nat1","pro_soc", "BID1.25", "BID2.5", "BID5")]
 wtp_ms <- na.omit(wtp_ms)
 wtp_ms[sapply(wtp_ms, is.character)] <- lapply(wtp_ms[sapply(wtp_ms, is.character)], 
-                                       as.factor)
+                                               as.factor)
 # Rename outcome as "y" (required by "bestglm()" function)
 wtp_ms_1.25 <- wtp_ms %>% select(-c(BID2.5, BID5)) %>% rename(y = BID1.25)
 wtp_ms_2.5 <- wtp_ms %>% select(-c(BID1.25, BID5)) %>% rename(y = BID2.5)
 wtp_ms_5 <- wtp_ms %>% select(-c(BID1.25, BID2.5)) %>% rename(y = BID5)
 
+
+##### Try a preliminary model
+glm.fits <- glm(BID2.5 ~ dist + res + gender + identity + age + island + CC + industry2 + Close + size_rev + pro_nat1 + econ_1 + econ_2.1 + pro_soc + tenure, 
+                family = binomial,
+                data = wtp_ms)
+
+# Predict outcome based on model coefficients
+glm.probs <- predict(glm.fits_5, type = "response")
+glm.probs[1:10]
+glm.pred <- rep(0, 174)
+glm.pred[glm.probs > 0.5] = 1
+table(glm.pred, wtp_m1$BID2.5)
+
+##### Best subset selection for WTP = 1/8 of 1%
 best.logit <- bestglm(wtp_ms_1.25,
                       IC = "AIC",                 # Information criteria for
                       family=binomial,
                       method = "exhaustive")
 summary(best.logit$BestModel) # AIC
-summary(best.logit.1$BestModel) # BIC
 
+# Best model is as follows:
+glm.fits_1.25 <- glm(BID1.25 ~ identity + size_rev + tenure + pro_nat1, 
+                family = binomial,
+                data = wtp_ms)
+summary(glm.fits_1.25)
+hl_1.25 <- hoslem.test(glm.fits_1.25$y, fitted(glm.fits_1.25), g=10) # Hosmer and Lemeshow goodness of fit (GOF) test
+hl_1.25 # p-value = 0.839, so there is no evidence of poor fit
+
+##### Best subset selection for WTP = 1/4 of 1%
 best.logit2 <- bestglm(wtp_ms_2.5,
                       IC = "AIC",                 # Information criteria for
                       family=binomial,
                       method = "exhaustive")
 summary(best.logit2$BestModel)
-summary(best.logit2.1$BestModel)
 
+# Best model is as follows:
+glm.fits_2.5 <- glm(BID2.5 ~ identity + island + tenure + pro_nat1, 
+                     family = binomial,
+                     data = wtp_ms)
+summary(glm.fits_2.5)
+hl_2.5 <- hoslem.test(glm.fits_2.5$y, fitted(glm.fits_2.5), g=10) # Hosmer and Lemeshow goodness of fit (GOF) test
+hl_2.5 # p-value = 0.5666, so there is no evidence of poor fit
+
+##### Best subset selection for WTP = 1/2 of 1%
 best.logit3 <- bestglm(wtp_ms_5,
                       IC = "AIC",                 # Information criteria for
                       family=binomial,
                       method = "exhaustive")
 summary(best.logit3$BestModel)
-summary(best.logit3.1$BestModel)
+
+# Best model is as follows:
+glm.fits_5 <- glm(BID5 ~ identity + island + CC + tenure + econ_2.1 + pro_nat1 + pro_soc, 
+                    family = binomial,
+                    data = wtp_ms)
+summary(glm.fits_5)
+hl_5 <- hoslem.test(glm.fits_5$y, fitted(glm.fits_5), g=10) # Hosmer and Lemeshow goodness of fit (GOF) test
+hl_5 # p-value = 0.1687, so there is no evidence of poor fit
+
+##### Model for revealed preference behavior
+wtp_rp <- wtp[,c("dist", "res", "identity", "age", "gender", "island", "Close", "CC", "industry2", "size_rev", "tenure", "econ_1", "econ_2.1","pro_nat1","pro_soc", "Revealed")]
+wtp_rp <- na.omit(wtp_rp)
+wtp_rp[sapply(wtp_rp, is.character)] <- lapply(wtp_rp[sapply(wtp_rp, is.character)], 
+                                               as.factor)
+glm.fits_rp <- glm(Revealed ~ dist + res + gender + identity + age + island + CC + industry2 + Close + size_rev + pro_nat1 + econ_1 + econ_2.1 + pro_soc + tenure, 
+                family = binomial,
+                data = wtp_rp)
+
+# Best subset selection for revealed preference behavior
+wtp_ms_rp <- wtp_rp %>% rename(y = Revealed)
+best.logit_rp <- bestglm(wtp_rp,
+                       IC = "AIC",                 # Information criteria for
+                       family=binomial,
+                       method = "exhaustive")
+summary(best.logit_rp$BestModel)
+
+# Best model is as follows:
+glm.fits_rp <- glm(Revealed ~ age + island + pro_soc, 
+                  family = binomial,
+                  data = wtp_rp)
+summary(glm.fits_rp)
+hl_rp <- hoslem.test(glm.fits_rp$y, fitted(glm.fits_rp), g=10) # Hosmer and Lemeshow goodness of fit (GOF) test
+hl_rp # p-value = 0.9951, so there is no evidence of poor fit
 
 
-# Use multinomial logistic regression instead, for fun (not used in final analysis)
 
 
 
 
+# Backwards selection
+glm.fits <- glm(BID2.5 ~ dist + res + gender + identity + age + island + CC + industry2 + Close + size_rev + pro_nat1 + econ_1 + econ_2.1 + pro_soc + tenure, 
+                family = binomial,
+                data = wtp_ms)
+deviance(glm.fits) # 192.1054
 
+glm.fits2 <- glm(BID2.5 ~ dist + res + gender + identity + age + island + CC + industry2 + Close + size_rev + pro_nat1 + econ_1 + econ_2.1 + tenure, 
+                family = binomial,
+                data = wtp_ms) # Eliminated "pro_soc"
+deviance(glm.fits2) # 192.21
+
+glm.fits3 <- glm(BID2.5 ~ dist + res + gender + identity + island + CC + industry2 + Close + size_rev + pro_nat1 + econ_1 + econ_2.1 + tenure, 
+                 family = binomial,
+                 data = wtp_ms) # Eliminated "age"
+deviance(glm.fits3) #192.293
+
+glm.fits4 <- glm(BID2.5 ~ dist + res + gender + identity + island + CC + industry2 + Close + size_rev + pro_nat1 + econ_1 + tenure, 
+                 family = binomial,
+                 data = wtp_ms) # Eliminated "econ_2.1"
+deviance(glm.fits4) #192.307
+
+glm.fits4 <- glm(BID2.5 ~ dist + res + gender + identity + island + CC + industry2 + Close + size_rev + pro_nat1 + econ_1 + tenure, 
+                 family = binomial,
+                 data = wtp_ms)
+deviance(glm.fits4)
 
