@@ -107,7 +107,7 @@ wtp_ms_5 <- wtp_ms %>% select(-c(BID1.25, BID2.5)) %>% rename(y = BID5)
 
 
 ##### Try a preliminary model
-glm.fits <- glm(BID2.5 ~ dist + res + gender + identity + age + island + CC + industry2 + Close + size_rev + pro_nat1 + econ_1 + econ_2.1 + pro_soc + tenure, 
+glm.fits <- glm(BID5 ~ dist + res + gender + identity + age + island + CC + industry2 + Close + size_rev + pro_nat1 + econ_1 + econ_2.1 + pro_soc + tenure, 
                 family = binomial,
                 data = wtp_ms)
 
@@ -188,10 +188,20 @@ summary(glm.fits_rp)
 hl_rp <- hoslem.test(glm.fits_rp$y, fitted(glm.fits_rp), g=10) # Hosmer and Lemeshow goodness of fit (GOF) test
 hl_rp # p-value = 0.9951, so there is no evidence of poor fit
 
+##### Descriptive statistics
+wtp_raw <- read.csv("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/business_wtp.csv")
 
+wtp_raw$island <- ifelse(wtp_raw$island == "Hawaii\tNorth Kona","Hawaii", wtp_raw$island) # Fix mistake
+wtp_raw$island <- ifelse(wtp_raw$island == "", NA, wtp_raw$island) # Translate blank to NA
+wtp_raw$prox <- ifelse(wtp_raw$prox == "Close to (<1 mile)", "Close", wtp_raw$prox)
+wtp_raw$dist <- ifelse(wtp_raw$dist == "in person " | wtp_raw$dist == "in", "in person", wtp_raw$dist)
+wtp_raw$gender <- ifelse(wtp_raw$gender == "", "Other", wtp_raw$gender)
+wtp_raw$industry1 <- ifelse(wtp_raw$industry1 == "Recreational surface", "Recreation surface", wtp_raw$industry1)
+wtp_raw$industry2 <- ifelse((wtp_raw$industry1 == "Retail" | wtp_raw$industry1 == "Restaurant" | wtp_raw$industry1 == "Lodging"), "Land", 
+                        ifelse(wtp_raw$industry1 == "Recreation surface", "Recreation surface",
+                               ifelse(wtp_raw$industry1 == "Recreation subsurface", "Recreation subsurface", 0)))
 
-
-
+sum(wtp_raw$yy, na.rm = TRUE)
 
 # Backwards selection
 glm.fits <- glm(BID2.5 ~ dist + res + gender + identity + age + island + CC + industry2 + Close + size_rev + pro_nat1 + econ_1 + econ_2.1 + pro_soc + tenure, 
