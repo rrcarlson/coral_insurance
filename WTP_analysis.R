@@ -18,6 +18,8 @@ library(psych)
 library(lme4)
 library(ResourceSelection)
 library(bestglm)
+library(ggplot2)
+library(ggthemes)
 
 ##### Read in data
 wtp <- read.csv("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/business_wtp.csv")
@@ -189,6 +191,7 @@ hl_rp <- hoslem.test(glm.fits_rp$y, fitted(glm.fits_rp), g=10) # Hosmer and Leme
 hl_rp # p-value = 0.9951, so there is no evidence of poor fit
 
 ##### Descriptive statistics
+# We don't need to cancel all rows with NA values to create summary statistics, so revert to raw dataset (with some labels cleaned)
 wtp_raw <- read.csv("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/business_wtp.csv")
 
 wtp_raw$island <- ifelse(wtp_raw$island == "Hawaii\tNorth Kona","Hawaii", wtp_raw$island) # Fix mistake
@@ -201,31 +204,103 @@ wtp_raw$industry2 <- ifelse((wtp_raw$industry1 == "Retail" | wtp_raw$industry1 =
                         ifelse(wtp_raw$industry1 == "Recreation surface", "Recreation surface",
                                ifelse(wtp_raw$industry1 == "Recreation subsurface", "Recreation subsurface", 0)))
 
-sum(wtp_raw$yy, na.rm = TRUE)
+sum(wtp_raw$yy, na.rm = TRUE) # yy interchangeable with any variable for sum stats
 
+##### Plotting regression results
+
+# Plot pro_nat1 relationships to BID
+# First, create a dataset just for plotting
+plot_df <- wtp_ms
+plot_df <- plot_df %>% mutate(yes5 = ifelse(BID5 == 1, pro_nat1, NA),
+                              no5 = ifelse(BID5 == 0, pro_nat1, NA),
+                              yes2.5 = ifelse(BID2.5 == 1, pro_nat1, NA),
+                              no2.5 = ifelse(BID2.5 == 0, pro_nat1, NA),
+                              yes1.25 = ifelse(BID1.25 == 1, pro_nat1, NA),
+                              no1.25 = ifelse(BID1.25 == 0, pro_nat1, NA))
+
+# Create dataset of sequential values of pro_nat1 matched with predictions for y
+Predicted_data <- data.frame(pro_nat1=seq(
+  0, 20,len=500))
+# Fill predicted y using univariate regression model
+glm_pro_nat5 <- glm(BID5 ~ pro_nat1, family = binomial, data = wtp_ms)
+glm_pro_nat2.5 <- glm(BID2.5 ~ pro_nat1, family = binomial, data = wtp_ms)
+glm_pro_nat1.25 <- glm(BID1.25 ~ pro_nat1, family = binomial, data = wtp_ms)
+
+Predicted_data$y5 = predict(glm_pro_nat5, Predicted_data, type="response")
+Predicted_data$y2.5 = predict(glm_pro_nat2.5, Predicted_data, type="response")
+Predicted_data$y1.25 = predict(glm_pro_nat1.25, Predicted_data, type="response")
+
+# pro_nat1 v. BID5
+base <- ggplot() +
+  #geom_point(data = wtp_ms, aes(x=pro_nat1, y=BID5), color = "orange", shape = "circle", size = 1) +
+  geom_line(data = Predicted_data, aes(x=pro_nat1, y=y5), linetype = "solid", size = 0.8, color="skyblue4") +
+  geom_rug(data = plot_df, aes(x = no5), sides = "b", alpha = 1, color = "red") +
+  geom_rug(data = plot_df, aes(x = yes5), sides = "t", alpha = 1, color = "red") +
+  labs(x = "Pro-nature values", y = "WTP (yes/no)") +
+  theme_hc() +
+  ylim(0,1)
+
+# pro_nat1 v. BID2.5
+base2 <- base +
+  #geom_point(data = wtp_ms, aes(x=pro_nat1, y=BID5), color = "orange", shape = "circle", size = 1) +
+  geom_line(data = Predicted_data, aes(x=pro_nat1, y=y2.5), linetype = "solid", size = 0.8, color="skyblue3") +
+  geom_rug(data = plot_df, aes(x = no2.5), sides = "b", alpha = 1, color = "orange") +
+  geom_rug(data = plot_df, aes(x = yes2.5), sides = "t", alpha = 1, color = "orange")
+
+# pro_nat1 v. BID1.25
+base2 +
+  #geom_point(data = wtp_ms, aes(x=pro_nat1, y=BID5), color = "orange", shape = "circle", size = 1) +
+  geom_line(data = Predicted_data, aes(x=pro_nat1, y=y1.25), linetype = "solid", size = 0.8, color="skyblue2") +
+  geom_rug(data = plot_df, aes(x = no1.25), sides = "b", alpha = 1, color = "orange") +
+  geom_rug(data = plot_df, aes(x = yes1.25), sides = "t", alpha = 1, color = "orange")
+
+# Plot seniority (`tenure`) and ethnicity v. BID
+# Since these are ordinal variables, we'll have to use a different approach to show trends
+# Create spineplots to show relationship between two ordinal vars
+# Create another dataset just for plotting
+plot_df2 <- wtp_ms
+plot_df2$maxWTP <- ifelse(plot_df2$BID5 == 1, "0.5%",
+                          ifelse(plot_df2$BID1.25 == 1, "0.125 - 0.25%", "0"))
+plot_df2$Kamaina <- ifelse(plot_df2$identity == "Kamaina", "Yes", "No")
+plot_df2 <- plot_df2 %>% filter(identity != "Other") # There are only 2 "Other" so it messes with the color palette sorting and isn't visible anyway
+
+# Customize labels and colors of spineplots
+Zissou <- as.vector(wes_palette("Zissou1"))
+Zissou2 <- c("#3B9AB2","#78B7C5","#E1AF00","#F21A00")
+
+spineplot(factor(plot_df2$tenure)~factor(plot_df2$maxWTP), col = rev(Zissou), ylevels = c(5,4,3,2,1))
+spineplot(factor(plot_df2$identity)~factor(plot_df2$maxWTP), col = Zissou2, ylevels = c("Native","Kamaina","Born","Temporary or seasonal"))
+# Labels don't show up well so--Hawaiian = red, Born = light blue, Kamaina = yellow, Temp = dark blue
+
+
+
+##### Scrap
 # Backwards selection
-glm.fits <- glm(BID2.5 ~ dist + res + gender + identity + age + island + CC + industry2 + Close + size_rev + pro_nat1 + econ_1 + econ_2.1 + pro_soc + tenure, 
-                family = binomial,
-                data = wtp_ms)
-deviance(glm.fits) # 192.1054
+# glm.fits <- glm(BID2.5 ~ dist + res + gender + identity + age + island + CC + industry2 + Close + size_rev + pro_nat1 + econ_1 + econ_2.1 + pro_soc + tenure, 
+#                 family = binomial,
+#                 data = wtp_ms)
+# deviance(glm.fits) # 192.1054
+# 
+# glm.fits2 <- glm(BID2.5 ~ dist + res + gender + identity + age + island + CC + industry2 + Close + size_rev + pro_nat1 + econ_1 + econ_2.1 + tenure, 
+#                  family = binomial,
+#                  data = wtp_ms) # Eliminated "pro_soc"
+# deviance(glm.fits2) # 192.21
+# 
+# glm.fits3 <- glm(BID2.5 ~ dist + res + gender + identity + island + CC + industry2 + Close + size_rev + pro_nat1 + econ_1 + econ_2.1 + tenure, 
+#                  family = binomial,
+#                  data = wtp_ms) # Eliminated "age"
+# deviance(glm.fits3) #192.293
+# 
+# glm.fits4 <- glm(BID2.5 ~ dist + res + gender + identity + island + CC + industry2 + Close + size_rev + pro_nat1 + econ_1 + tenure, 
+#                  family = binomial,
+#                  data = wtp_ms) # Eliminated "econ_2.1"
+# deviance(glm.fits4) #192.307
+# 
+# glm.fits4 <- glm(BID2.5 ~ dist + res + gender + identity + island + CC + industry2 + Close + size_rev + pro_nat1 + econ_1 + tenure, 
+#                  family = binomial,
+#                  data = wtp_ms)
+# deviance(glm.fits4)
 
-glm.fits2 <- glm(BID2.5 ~ dist + res + gender + identity + age + island + CC + industry2 + Close + size_rev + pro_nat1 + econ_1 + econ_2.1 + tenure, 
-                family = binomial,
-                data = wtp_ms) # Eliminated "pro_soc"
-deviance(glm.fits2) # 192.21
 
-glm.fits3 <- glm(BID2.5 ~ dist + res + gender + identity + island + CC + industry2 + Close + size_rev + pro_nat1 + econ_1 + econ_2.1 + tenure, 
-                 family = binomial,
-                 data = wtp_ms) # Eliminated "age"
-deviance(glm.fits3) #192.293
 
-glm.fits4 <- glm(BID2.5 ~ dist + res + gender + identity + island + CC + industry2 + Close + size_rev + pro_nat1 + econ_1 + tenure, 
-                 family = binomial,
-                 data = wtp_ms) # Eliminated "econ_2.1"
-deviance(glm.fits4) #192.307
-
-glm.fits4 <- glm(BID2.5 ~ dist + res + gender + identity + island + CC + industry2 + Close + size_rev + pro_nat1 + econ_1 + tenure, 
-                 family = binomial,
-                 data = wtp_ms)
-deviance(glm.fits4)
 
