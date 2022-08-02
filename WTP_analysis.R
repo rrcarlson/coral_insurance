@@ -20,6 +20,7 @@ library(ResourceSelection)
 library(bestglm)
 library(ggplot2)
 library(ggthemes)
+library(wesanderson)
 
 ##### Read in data
 wtp <- read.csv("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/business_wtp.csv")
@@ -49,7 +50,7 @@ wtp <- wtp %>% filter(!is.na(BID1.25))
 # Trim dataset to core variables in model
 wtp_corr <- wtp
 wtp_corr$island_num <- ifelse(wtp_corr$island == "Hawaii", 1, 0)
-wtp_corr <- wtp_corr[,c("CC", "size_rev", "influence", "econ_1", "econ_2","pro_nat1","pro_soc","age","island_num")]
+wtp_corr <- wtp_corr[,c("CC", "size_rev", "influence", "econ_1", "econ_2","pro_nat1","pro_soc","age","island_num", "res")]
 wtp_corr <- wtp_corr %>% filter(CC < 100) # "Unsure" for CC is 555, so filter this out
 
 # Test for correlation
@@ -77,6 +78,34 @@ pairs.panels(wtp_corr,
 
 # No problematic correlations detected
 
+# Check for correlations between categorical variables
+# Those we will model are: dist, identity, gender, island, close, industry2
+wtp_corr2 <- wtp
+wtp_corr2$island_num <- ifelse(wtp_corr2$island == "Hawaii", 1, 0)
+wtp_corr2 <- wtp_corr2[,c("dist","identity","gender","island","Close","industry2","CC", "size_rev", "influence", "econ_1", "econ_2","pro_nat1","pro_soc","age","island_num", "res", "tenure")]
+wtp_corr2 <- wtp_corr2 %>% filter(CC < 100) # "Unsure" for CC is 555, so filter this out
+
+# Chi-2 between categorical variables
+wtp_corr2_cat <- wtp_corr2 %>% select(c(dist, identity, gender, island, Close, industry2))
+wtp_corr2_cat <- na.omit(wtp_corr2_cat)
+wtp_corr2_cat[] <- lapply(wtp_corr2_cat, as.factor)
+# Do the following for all variables
+chisq.test(wtp_corr2_cat$dist, wtp_corr2_cat$industry2) # Dist not independent from industry2, island, or identity
+chisq.test(wtp_corr2_cat$identity, wtp_corr2_cat$industry2) # Identity is independent from everything but dist
+chisq.test(wtp_corr2_cat$gender, wtp_corr2_cat$industry2) # Gender is not independent from industry2
+chisq.test(wtp_corr2_cat$island, wtp_corr2_cat$industry2) # Island is independent from everything but dist
+chisq.test(wtp_corr2_cat$Close, wtp_corr2_cat$industry2) # Distance is not independent from industry2
+# "We found that gender was not independent from industry (certain industries were male- or female-dominated) and distribution method was correlated with several variables (industry, island, and identity), so we removed both gender and distribution method from analysis
+# Convert categorical binary variables to 0, 1 to prepare for Point Biserial Correlation test
+wtp_corr2$hawaiian <- ifelse(wtp_corr2$identity == "Native", 1, 0)
+wtp_corr2$big <- ifelse(wtp_corr2$island == "Hawaii", 1, 0)
+cor.test(wtp_corr2$pro_nat1, wtp_corr2$hawaiian) # Hawaiian identity is not correlated with pro_nat1
+cor.test(wtp_corr2$res, wtp_corr2$hawaiian) # Hawaiian identity is correlated with years on island, but not > 0.70
+cor.test(wtp_corr2$tenure, wtp_corr2$hawaiian) # Hawaiian identity is correlated with years on island, but not > 0.70. No other Hawaiian correlation.
+cor.test(wtp_corr2$influence, wtp_corr2$big) # Big island associated with influence and age but not > 0.70
+
+# Get rid of "close", "dist", and "gender"
+
 # Convert response variables to factors
 wtp_m1 <- wtp %>% filter(!is.na(BID1.25))
 wtp_m1 <- wtp_m1 %>% filter(!is.na(size_rev))
@@ -103,9 +132,9 @@ wtp_ms <- na.omit(wtp_ms)
 wtp_ms[sapply(wtp_ms, is.character)] <- lapply(wtp_ms[sapply(wtp_ms, is.character)], 
                                                as.factor)
 # Rename outcome as "y" (required by "bestglm()" function)
-wtp_ms_1.25 <- wtp_ms %>% select(-c(BID2.5, BID5)) %>% rename(y = BID1.25)
-wtp_ms_2.5 <- wtp_ms %>% select(-c(BID1.25, BID5)) %>% rename(y = BID2.5)
-wtp_ms_5 <- wtp_ms %>% select(-c(BID1.25, BID2.5)) %>% rename(y = BID5)
+wtp_ms_1.25 <- wtp_ms %>% select(-c(BID2.5, BID5, gender, Close, dist)) %>% rename(y = BID1.25)
+wtp_ms_2.5 <- wtp_ms %>% select(-c(BID1.25, BID5, gender, Close, dist)) %>% rename(y = BID2.5)
+wtp_ms_5 <- wtp_ms %>% select(-c(BID1.25, BID2.5, gender, Close, dist)) %>% rename(y = BID5)
 
 
 ##### Try a preliminary model

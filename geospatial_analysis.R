@@ -10,6 +10,7 @@ library(raster)
 library(sf)
 library(tidyverse)
 library(ISLR2)
+library(ggplot2)
 
 ##### Coral health: Load GAO coral cover data for Oahu and Hawaii Island
 
@@ -412,33 +413,36 @@ st_write(bus, "/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/Spat
 st_write(bus_land, "/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/Spatial/bus_land_vis.shp")
 
 ##### Bootstrapping to compare means
+## Note: variable/attribute names are modified slightly depending on how csvs automatically retitle variables (argh). You may have to revise these.
+## There are some weird discrepancies between when I first ran results and when I re-ran them using the above "bus_land" csv. Check on this.
 
 ##### Value (flood)
 
 # Create a lean dataset with only the variables of interest, taking the average flood score across all locations
+bus_land <- st_read("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/Spatial/bus_land_vis.shp")
 flood_bts <- bus_land %>% as.data.frame() %>% select(-geometry) %>% 
-  dplyr::group_by(Name,identity,tenure,industry1,industry_sub, outside, influence, age, island, prox, revenue) %>% 
+  dplyr::group_by(Name,identty,tenure,indstr1,indstr_, outside, influnc, age, island, prox, revenue) %>% 
   summarize(fl_perc = mean(Q16_4),
-            fl_val_10 = max(fl_val_10),
-            fl_score_10 = mean(fl_score_10),
-            fl_score_50 = mean(fl_score_50),
-            fl_score_100 = mean(fl_score_100),
-            fl_score_500 = mean(fl_score_500))
+            fl_v_10 = max(fl_v_10),
+            fl_s_10 = mean(fl_s_10),
+            fl_s_50 = mean(fl_s_50),
+            fl_s_100 = mean(fl_s_100),
+            fl_s_500 = mean(fl_s_500))
 
-flood_bts$industry1 <- ifelse(flood_bts$industry1 == "Recreational surface","Recreation surface",flood_bts$industry1)
+flood_bts$indstr1 <- ifelse(flood_bts$indstr1 == "Recreational surface","Recreation surface",flood_bts$indstr1)
 
 # Bootstrap based on grouping variables of interest
-bt_sub <- flood_bts %>% filter((island == "Oahu") & !is.na(fl_perc))
-n = length(bt_sub$fl_perc)
+bt_sub <- flood_bts %>% filter((indstr1 == "Restaurant" | indstr1 == "Lodging") & !is.na(fl_s_10))
+n = length(bt_sub$fl_s_10)
 B = 10000
 result = rep(NA, B)
 for (i in 1:B) {
   boot.sample = sample(n, replace = TRUE)
-  result[i] = mean(bt_sub$fl_perc[boot.sample])
+  result[i] = mean(bt_sub$fl_s_10[boot.sample])
 }
-with(bt_sub, mean(fl_perc) + c(-1, 1) * 2 * sd(result))
+with(bt_sub, mean(fl_s_10) + c(-1, 1) * 2 * sd(result))
 #-0.6688349  0.3525956
-mean(bt_sub$fl_perc) #-0.1581197
+mean(bt_sub$fl_s_10) #-0.1581197
 
 ##### Value (recreation)
 REC_bts <- bus %>% as.data.frame() %>% select(-geometry) %>% 
@@ -480,17 +484,17 @@ CC_bts <- bus %>% as.data.frame() %>% select(-geometry) %>%
 CC_bts$industry1 <- ifelse(CC_bts$industry1 == "Recreational surface","Recreation surface",CC_bts$industry1)
 
 # Bootstrap based on grouping variables of interest
-bt_sub <- CC_bts %>% filter((island == "Oahu") & (!is.na(CC_score)))
-n = length(bt_sub$CC_score)
+bt_sub <- CC_bts %>% filter((island == "Oahu") & (!is.na(ACC_mean)))
+n = length(bt_sub$ACC_mean)
 B = 10000
 result = rep(NA, B)
 for (i in 1:B) {
   boot.sample = sample(n, replace = TRUE)
-  result[i] = mean(bt_sub$CC_score[boot.sample])
+  result[i] = mean(bt_sub$ACC_mean[boot.sample])
 }
-with(bt_sub, mean(CC_score) + c(-1, 1) * 2 * sd(result))
+with(bt_sub, mean(ACC_mean) + c(-1, 1) * 2 * sd(result))
 #-0.6688349  0.3525956
-mean(bt_sub$CC_score) #-0.1581197
+mean(bt_sub$ACC_mean) #-0.1581197
 
 ###### Data summaries for manuscript
 
@@ -500,6 +504,89 @@ mean(bus_stats$mn, na.rm = TRUE) # -0.39
 sd(bus_stats$mn, na.rm = TRUE) # 1.22
 
 sum(bus_land$fl_val_10 == 1)
+
+####### Bootstrap plots for manuscript
+boot <- read.csv("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/Figs_bootstrap.csv")
+boot$Group <- factor(boot$Group,levels = c("Coral cover", "On-reef industry", "Island","Industry","Coral value rec", "Coral value flood"))
+
+# Coral health
+ggplot(boot[1:6,], aes(x = Group2, y = Y_axis, fill = forcats::fct_rev(X_axis))) +
+  geom_bar(position = position_dodge(), stat = "identity",
+           colour = "black",
+           size = 0.3) +
+  geom_errorbar(aes(ymin = Y_axis-sd, ymax = Y_axis+sd), width =0.3, position = position_dodge(.9)) +
+  ylim(0,5) +
+  theme_classic() +
+  scale_fill_manual(values=c("#3B9AB2", "#E1AF00"))
+
+ggplot(boot[7:10,], aes(x = Group, y = Y_axis, fill = forcats::fct_rev(X_axis))) +
+  geom_bar(position = position_dodge(), stat = "identity",
+           colour = "black",
+           size = 0.3) +
+  geom_errorbar(aes(ymin = Y_axis-sd, ymax = Y_axis+sd), width =0.3, position = position_dodge(.9)) +
+  ylim(0,5) +
+  theme_classic() +
+  scale_fill_manual(values=c("#3B9AB2", "#E1AF00"))
+
+# Coral value to tourism/recreation
+ggplot(boot[15:16,], aes(x = Group, y = Y_axis, fill = forcats::fct_rev(X_axis))) +
+  geom_bar(position = position_dodge(), stat = "identity",
+           colour = "black",
+           size = 0.3) +
+  geom_errorbar(aes(ymin = Y_axis-sd, ymax = Y_axis+sd), width =0.3, position = position_dodge(.9)) +
+  ylim(0,5) +
+  theme_classic() +
+  scale_fill_manual(values=c("#3B9AB2", "#E1AF00"))
+  
+ggplot(boot[17:20,], aes(x = Group, y = Y_axis, fill = X_axis)) +
+  geom_bar(position = position_dodge(), stat = "identity",
+           colour = "black",
+           size = 0.3) +
+  geom_errorbar(aes(ymin = Y_axis-sd, ymax = Y_axis+sd), width =0.3, position = position_dodge(.9)) +
+  ylim(0,5) +
+  theme_classic() +
+  scale_fill_manual(values=Zissou2)
+
+ggplot(boot[21:24,], aes(x = Group, y = Y_axis, fill = X_axis)) +
+  geom_bar(position = position_dodge(), stat = "identity",
+           colour = "black",
+           size = 0.3) +
+  geom_errorbar(aes(ymin = Y_axis-sd, ymax = Y_axis+sd), width =0.3, position = position_dodge(.9)) +
+  ylim(-3,1) +
+  theme_classic() +
+  scale_fill_manual(values=Zissou2)
+
+# Coral value to flood protection
+
+ggplot(boot[25:26,], aes(x = Group, y = Y_axis, fill = forcats::fct_rev(X_axis))) +
+  geom_bar(position = position_dodge(), stat = "identity",
+           colour = "black",
+           size = 0.3) +
+  geom_errorbar(aes(ymin = Y_axis-sd, ymax = Y_axis+sd), width =0.3, position = position_dodge(.9)) +
+  ylim(0,5) +
+  theme_classic() +
+  scale_fill_manual(values=c("#3B9AB2", "#E1AF00"))
+
+ggplot(boot[27:30,], aes(x = Group, y = Y_axis, fill = X_axis)) +
+  geom_bar(position = position_dodge(), stat = "identity",
+           colour = "black",
+           size = 0.3) +
+  geom_errorbar(aes(ymin = Y_axis-sd, ymax = Y_axis+sd), width =0.3, position = position_dodge(.9)) +
+  ylim(0,5) +
+  theme_classic() +
+  scale_fill_manual(values=Zissou2)
+
+ggplot(boot[31:34,], aes(x = Group, y = Y_axis, fill = X_axis)) +
+  geom_bar(position = position_dodge(), stat = "identity",
+           colour = "black",
+           size = 0.3) +
+  geom_errorbar(aes(ymin = Y_axis-sd, ymax = Y_axis+sd), width =0.3, position = position_dodge(.9)) +
+  ylim(-3,1.5) +
+  theme_classic() +
+  scale_fill_manual(values=Zissou2)
+
+
+
 
 
 
