@@ -56,10 +56,10 @@ rec_Maui <- st_crop(rec_all, st_bbox(Maui_clip))
 ##### Rescale all layers based on 5 quantiles
 
 # Resample GAO raster since it's too large to calculate quantiles
-# GAO_HI_40 <- aggregate(GAO_Hawaii, fact = 20, na.rm = TRUE)
-# GAO_Oahu_40 <- aggregate(GAO_Oahu, fact = 20, na.rm = TRUE)
-GAO_Kauai_40 <- aggregate(GAO_Kauai, fact = 20, na.rm = TRUE)
-GAO_Maui_40 <- aggregate(GAO_Maui, fact = 20, na.rm = TRUE)
+GAO_HI_40 <- raster("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/Spatial/Basemaps/GAO_Hawaii_merged_40m.tif")
+GAO_Oahu_40 <- raster("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/Spatial/Basemaps/GAO_Oahu_40m.tif")
+GAO_Kauai_40 <- raster("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/Spatial/Basemaps/GAO_Kauai_40m.tif")
+GAO_Maui_40 <- raster("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/Spatial/Basemaps/GAO_Maui_40m.tif")
 # Determine quantile breaking points
 q_gao_hi <- raster::quantile(GAO_HI_40, probs = c(0.2, 0.4, 0.6, 0.8), names = FALSE, na.rm = TRUE)
 q_gao_oahu <- raster::quantile(GAO_Oahu_40, probs = c(0.2, 0.4, 0.6, 0.8), names = FALSE, na.rm = TRUE)
@@ -123,10 +123,10 @@ bus_1k_Oahu <- st_read("/Users/rachelcarlson/Documents/Research/Coral_Insurance/
 bus_200m_Oahu <- st_read("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/GAO_CC/bus_200m_Oahu_filled.shp")
 
 # For points where GAO is NA for CC, replace NA values with CC values from PacIOOS
-bus_1k_Oahu$ACC_men <- ifelse(is.na(bus_1k_Oahu$ACC_men), bus_1k_Oahu$X_mean*100, bus_1k_Oahu$ACC_men)
+bus_1k_Oahu$ACC_mean <- ifelse(is.na(bus_1k_Oahu$ACC_mean), bus_1k_Oahu$X_mean*100, bus_1k_Oahu$ACC_mean)
 bus_1k_Oahu$ACC_max <- ifelse(is.infinite(bus_1k_Oahu$ACC_max), bus_1k_Oahu$X_max*100, bus_1k_Oahu$ACC_max)
 
-bus_200m_Oahu$ACC_men <- ifelse(is.na(bus_200m_Oahu$ACC_men), bus_200m_Oahu$X_mean*100, bus_200m_Oahu$ACC_men)
+bus_200m_Oahu$ACC_mean <- ifelse(is.na(bus_200m_Oahu$ACC_mean), bus_200m_Oahu$X_mean*100, bus_200m_Oahu$ACC_mean)
 bus_200m_Oahu$ACC_max <- ifelse(is.infinite(bus_200m_Oahu$ACC_max), bus_200m_Oahu$X_max*100, bus_200m_Oahu$ACC_max)
 
 # QGIS changed column names, so change them back
@@ -499,7 +499,7 @@ mean(bt_sub$ACC_mean) #-0.1581197
 ###### Data summaries for manuscript
 
 # Basic script to vary with stat and dataset (whether bus - sea only for rec and CC - or bus_land - land locations for flood value)
-bus_stats <- bus_land %>% as.data.frame() %>% select(-geometry) %>% dplyr::group_by(Name) %>% summarize(mn = mean(Q16_4))
+bus_stats <- bus %>% as.data.frame() %>% select(-geometry) %>% dplyr::group_by(Name) %>% summarize(mn = mean(ACC_mean_scaled_2))
 mean(bus_stats$mn, na.rm = TRUE) # -0.39
 sd(bus_stats$mn, na.rm = TRUE) # 1.22
 
