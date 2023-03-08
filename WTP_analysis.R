@@ -23,7 +23,7 @@ library(ggthemes)
 library(wesanderson)
 
 ##### Read in data
-wtp <- read.csv("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/business_wtp.csv")
+wtp <- read.csv("/Users/rachelcarlson/Documents/Research/PhD-2018-2022/Coral_Insurance/Data/business_wtp.csv")
 
 ##### Clean data
 # Remove geospatial markers (not needed) and any other uneeded columns
@@ -34,24 +34,27 @@ wtp <- wtp %>% select(-email)
 unique(wtp$island)
 wtp$island <- ifelse(wtp$island == "Hawaii\tNorth Kona","Hawaii", wtp$island) # Fix mistake
 wtp$island <- ifelse(wtp$island == "", NA, wtp$island) # Translate blank to NA
+unique(wtp$prox)
 wtp$prox <- ifelse(wtp$prox == "Close to (<1 mile)", "Close", wtp$prox)
+unique(wtp$dist)
 wtp$dist <- ifelse(wtp$dist == "in person " | wtp$dist == "in", "in person", wtp$dist)
+unique(wtp$gender)
 wtp$gender <- ifelse(wtp$gender == "", "Other", wtp$gender)
+unique(wtp$industry1)
 wtp$industry1 <- ifelse(wtp$industry1 == "Recreational surface", "Recreation surface", wtp$industry1)
-wtp$CC <- ifelse(wtp$CC == 555, 3, wtp$CC) # Don't want to exclude "unsure" respondents from regression but this high value may skew effect size
+wtp$CC <- ifelse(wtp$CC == 555, 3, wtp$CC) # Don't want to exclude "unsure" respondents from regression but this high value may skew effect size. Therefore, set "unsure" as 3 on 1-5 scale.
 
 
 ##### Summary statistics
 
 ##### WTP
 sum(!is.na(wtp$ans1)) # 15 businesses left WTP blank, so we have a sample size of n = 181 for this formula
-wtp <- wtp %>% filter(!is.na(BID1.25))
+wtp <- wtp %>% filter(!is.na(BID1.25)) # BID1.25 is a column signifying y/n to 1/8 of 1% of annual revenue. Those with NA in 1.25 have NA for WTP in general (no respondent gave answer to just one bid).
 
 # Trim dataset to core variables in model
 wtp_corr <- wtp
 wtp_corr$island_num <- ifelse(wtp_corr$island == "Hawaii", 1, 0)
 wtp_corr <- wtp_corr[,c("CC", "size_rev", "influence", "econ_1", "econ_2","pro_nat1","pro_soc","age","island_num", "res")]
-wtp_corr <- wtp_corr %>% filter(CC < 100) # "Unsure" for CC is 555, so filter this out
 
 # Test for correlation
 pairs(wtp_corr, pch = 19)
@@ -79,7 +82,13 @@ pairs.panels(wtp_corr,
 # No problematic correlations detected
 
 # Check for correlations between categorical variables
-# Those we will model are: dist, identity, gender, island, close, industry2
+# First, define some new variables that you will need for analysis.
+wtp$Close <- ifelse(wtp$prox == "Close" | wtp$prox == "Beachfront", 1, 0) # Redefine proximity as close or far
+wtp$industry2 <- ifelse((wtp$industry1 == "Retail" | wtp$industry1 == "Restaurant" | wtp$industry1 == "Lodging"), "Land", 
+                        ifelse(wtp$industry1 == "Recreation surface", "Recreation surface",
+                               ifelse(wtp$industry1 == "Recreation subsurface", "Recreation subsurface", 0))) # Redefine industry as recreation "surface", recreation "subsurface" or land-based
+wtp$islandOahu <- ifelse(wtp$island == "Oahu" | wtp$island == "Multi", 1, 0) # If I want to define "multi" island as inclusive of both Hawaii and Oahu, not a third category
+
 wtp_corr2 <- wtp
 wtp_corr2$island_num <- ifelse(wtp_corr2$island == "Hawaii", 1, 0)
 wtp_corr2 <- wtp_corr2[,c("dist","identity","gender","island","Close","industry2","CC", "size_rev", "influence", "econ_1", "econ_2","pro_nat1","pro_soc","age","island_num", "res", "tenure")]
@@ -106,6 +115,7 @@ cor.test(wtp_corr2$influence, wtp_corr2$big) # Big island associated with influe
 
 # Get rid of "close", "dist", and "gender"
 
+##### Done with testing - now analysis
 # Convert response variables to factors
 wtp_m1 <- wtp %>% filter(!is.na(BID1.25))
 wtp_m1 <- wtp_m1 %>% filter(!is.na(size_rev))
@@ -115,14 +125,6 @@ wtp_m1$BID2.5 <- as.factor(wtp_m1$BID2.5)
 wtp_m1$BID1.25 <- as.factor(wtp_m1$BID1.25)
 
 ##### Redefine dataset to include only the variables I am testing
-# Redefine proximity as close or far
-wtp$Close <- ifelse(wtp$prox == "Close" | wtp$prox == "Beachfront", 1, 0)
-# Redefine industry as recreation "surface", recreation "subsurface" or land-based
-wtp$industry2 <- ifelse((wtp$industry1 == "Retail" | wtp$industry1 == "Restaurant" | wtp$industry1 == "Lodging"), "Land", 
-                           ifelse(wtp$industry1 == "Recreation surface", "Recreation surface",
-                                  ifelse(wtp$industry1 == "Recreation subsurface", "Recreation subsurface", 0)))
-# If I want to define "multi" island as inclusive of both Hawaii and Oahu, not a third category
-wtp$islandOahu <- ifelse(wtp$island == "Oahu" | wtp$island == "Multi", 1, 0)
 
 ##### Dataset for model
 wtp_ms <- wtp[,c("dist", "res", "identity", "age", "gender", "island", "Close", "CC", "industry2", "size_rev", "tenure", "econ_1", "econ_2.1","pro_nat1","pro_soc", "BID1.25", "BID2.5", "BID5")]
@@ -150,6 +152,10 @@ glm.pred[glm.probs > 0.5] = 1
 table(glm.pred, wtp_m1$BID2.5)
 
 ##### Best subset selection for WTP = 1/8 of 1%
+# First convert characters to factors since bestglm doesn't take characters.
+col_names <- c("identity","island","industry2")
+wtp_ms_1.25[col_names] <- lapply(wtp_ms_1.25[col_names] , factor)
+
 best.logit <- bestglm(wtp_ms_1.25,
                       IC = "AIC",                 # Information criteria for
                       family=binomial,
@@ -165,6 +171,9 @@ hl_1.25 <- hoslem.test(glm.fits_1.25$y, fitted(glm.fits_1.25), g=10) # Hosmer an
 hl_1.25 # p-value = 0.839, so there is no evidence of poor fit
 
 ##### Best subset selection for WTP = 1/4 of 1%
+# First convert characters to factors since bestglm doesn't take characters.
+col_names <- c("identity","island","industry2")
+wtp_ms_1.25[col_names] <- lapply(wtp_ms_1.25[col_names] , factor)
 best.logit2 <- bestglm(wtp_ms_2.5,
                       IC = "AIC",                 # Information criteria for
                       family=binomial,
@@ -297,8 +306,12 @@ plot_df2 <- plot_df2 %>% filter(identity != "Other") # There are only 2 "Other" 
 Zissou <- as.vector(wes_palette("Zissou1"))
 Zissou2 <- c("#3B9AB2","#78B7C5","#E1AF00","#F21A00")
 
-spineplot(factor(plot_df2$tenure)~factor(plot_df2$maxWTP), col = rev(Zissou), ylevels = c(5,4,3,2,1))
-spineplot(factor(plot_df2$identity)~factor(plot_df2$maxWTP), col = Zissou2, ylevels = c("Native","Kamaina","Born","Temporary or seasonal"))
+# Shading color palette (requested by Gretchen)
+shading <- c("#9DD3EB","#98BAD9","#7D92B8","#59638F","#3E395E")
+shading2 <- c("#4f4140","#9DD3EB","#98BAD9","#59638F")
+
+spineplot(factor(plot_df2$tenure)~factor(plot_df2$maxWTP), col = shading, ylevels = c(5,4,3,2,1))
+spineplot(factor(plot_df2$identity)~factor(plot_df2$maxWTP), col = shading2, ylevels = c("Native","Kamaina","Born","Temporary or seasonal"))
 # Labels don't show up well so--Hawaiian = red, Born = light blue, Kamaina = yellow, Temp = dark blue
 
 
