@@ -43,12 +43,14 @@ wtp$gender <- ifelse(wtp$gender == "", "Other", wtp$gender)
 unique(wtp$industry1)
 wtp$industry1 <- ifelse(wtp$industry1 == "Recreational surface", "Recreation surface", wtp$industry1)
 wtp$CC <- ifelse(wtp$CC == 555, 3, wtp$CC) # Don't want to exclude "unsure" respondents from regression but this high value may skew effect size. Therefore, set "unsure" as 3 on 1-5 scale.
-
+# There is a mistaken repeated visit to "Guava Shop". Delete response from "associate" and retain response from "general manager".
+wtp <- wtp %>% filter(Name != "Guava Shop Haleiwa")
+wtp <- wtp %>% filter(Name != "Kama'aina Kids Kayak and Snorkel Eco-ventures")
 
 ##### Summary statistics
 
 ##### WTP
-sum(!is.na(wtp$ans1)) # 15 businesses left WTP blank, so we have a sample size of n = 181 for this formula
+sum(!is.na(wtp$ans1)) # 15 businesses left WTP blank, so we have a sample size of n = 179 for this formula
 wtp <- wtp %>% filter(!is.na(BID1.25)) # BID1.25 is a column signifying y/n to 1/8 of 1% of annual revenue. Those with NA in 1.25 have NA for WTP in general (no respondent gave answer to just one bid).
 
 # Trim dataset to core variables in model
@@ -118,6 +120,7 @@ cor.test(wtp_corr2$influence, wtp_corr2$big) # Big island associated with influe
 ##### Done with testing - now analysis
 # Convert response variables to factors
 wtp_m1 <- wtp %>% filter(!is.na(BID1.25))
+# Several people were reluctant to report revenue. Must exclude those since need revenue data in model
 wtp_m1 <- wtp_m1 %>% filter(!is.na(size_rev))
 
 wtp_m1$BID5 <- as.factor(wtp_m1$BID5)
@@ -130,7 +133,7 @@ wtp_m1$BID1.25 <- as.factor(wtp_m1$BID1.25)
 wtp_ms <- wtp[,c("dist", "res", "identity", "age", "gender", "island", "Close", "CC", "industry2", "size_rev", "tenure", "econ_1", "econ_2.1","pro_nat1","pro_soc", "BID1.25", "BID2.5", "BID5")]
 # wtp_ms$islandHawaii <- ifelse(wtp_ms$island == "Hawaii" | wtp_ms$island == "Multi", 1, 0)
 
-wtp_ms <- na.omit(wtp_ms)
+wtp_ms <- na.omit(wtp_ms) # n = 171
 wtp_ms[sapply(wtp_ms, is.character)] <- lapply(wtp_ms[sapply(wtp_ms, is.character)], 
                                                as.factor)
 # Rename outcome as "y" (required by "bestglm()" function)
@@ -168,12 +171,12 @@ glm.fits_1.25 <- glm(BID1.25 ~ identity + size_rev + tenure + pro_nat1,
                 data = wtp_ms)
 summary(glm.fits_1.25)
 hl_1.25 <- hoslem.test(glm.fits_1.25$y, fitted(glm.fits_1.25), g=10) # Hosmer and Lemeshow goodness of fit (GOF) test
-hl_1.25 # p-value = 0.839, so there is no evidence of poor fit
+hl_1.25 # p-value = 0.913, so there is no evidence of poor fit
 
 ##### Best subset selection for WTP = 1/4 of 1%
-# First convert characters to factors since bestglm doesn't take characters.
-col_names <- c("identity","island","industry2")
-wtp_ms_1.25[col_names] <- lapply(wtp_ms_1.25[col_names] , factor)
+# Again convert characters to factors since bestglm doesn't take characters.
+wtp_ms_2.5[col_names] <- lapply(wtp_ms_2.5[col_names] , factor)
+
 best.logit2 <- bestglm(wtp_ms_2.5,
                       IC = "AIC",                 # Information criteria for
                       family=binomial,
@@ -186,9 +189,12 @@ glm.fits_2.5 <- glm(BID2.5 ~ identity + island + tenure + pro_nat1,
                      data = wtp_ms)
 summary(glm.fits_2.5)
 hl_2.5 <- hoslem.test(glm.fits_2.5$y, fitted(glm.fits_2.5), g=10) # Hosmer and Lemeshow goodness of fit (GOF) test
-hl_2.5 # p-value = 0.5666, so there is no evidence of poor fit
+hl_2.5 # p-value = 0.752, so there is no evidence of poor fit
 
 ##### Best subset selection for WTP = 1/2 of 1%
+# Again convert characters to factors since bestglm doesn't take characters.
+wtp_ms_5[col_names] <- lapply(wtp_ms_5[col_names] , factor)
+
 best.logit3 <- bestglm(wtp_ms_5,
                       IC = "AIC",                 # Information criteria for
                       family=binomial,
@@ -201,7 +207,7 @@ glm.fits_5 <- glm(BID5 ~ identity + island + CC + tenure + econ_2.1 + pro_nat1 +
                     data = wtp_ms)
 summary(glm.fits_5)
 hl_5 <- hoslem.test(glm.fits_5$y, fitted(glm.fits_5), g=10) # Hosmer and Lemeshow goodness of fit (GOF) test
-hl_5 # p-value = 0.1687, so there is no evidence of poor fit
+hl_5 # p-value = 0.4926 so there is no evidence of poor fit
 
 ##### Model for revealed preference behavior
 wtp_rp <- wtp[,c("dist", "res", "identity", "age", "gender", "island", "Close", "CC", "industry2", "size_rev", "tenure", "econ_1", "econ_2.1","pro_nat1","pro_soc", "Revealed")]
@@ -226,11 +232,11 @@ glm.fits_rp <- glm(Revealed ~ age + island + pro_soc,
                   data = wtp_rp)
 summary(glm.fits_rp)
 hl_rp <- hoslem.test(glm.fits_rp$y, fitted(glm.fits_rp), g=10) # Hosmer and Lemeshow goodness of fit (GOF) test
-hl_rp # p-value = 0.9951, so there is no evidence of poor fit
+hl_rp # p-value = 0.7985, so there is no evidence of poor fit
 
 ##### Descriptive statistics
 # We don't need to cancel all rows with NA values to create summary statistics, so revert to raw dataset (with some labels cleaned)
-wtp_raw <- read.csv("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/business_wtp.csv")
+wtp_raw <- read.csv("/Users/rachelcarlson/Documents/Research/PhD-2018-2022/Coral_Insurance/Data/business_wtp.csv")
 
 wtp_raw$island <- ifelse(wtp_raw$island == "Hawaii\tNorth Kona","Hawaii", wtp_raw$island) # Fix mistake
 wtp_raw$island <- ifelse(wtp_raw$island == "", NA, wtp_raw$island) # Translate blank to NA
@@ -241,8 +247,14 @@ wtp_raw$industry1 <- ifelse(wtp_raw$industry1 == "Recreational surface", "Recrea
 wtp_raw$industry2 <- ifelse((wtp_raw$industry1 == "Retail" | wtp_raw$industry1 == "Restaurant" | wtp_raw$industry1 == "Lodging"), "Land", 
                         ifelse(wtp_raw$industry1 == "Recreation surface", "Recreation surface",
                                ifelse(wtp_raw$industry1 == "Recreation subsurface", "Recreation subsurface", 0)))
+wtp_raw <- wtp_raw %>% filter(Name != "Guava Shop Haleiwa")
+wtp_raw <- wtp_raw %>% filter(Name != "Kama'aina Kids Kayak and Snorkel Eco-ventures")
+wtp_raw$CC <- ifelse(wtp_raw$CC == 555, 3, wtp_raw$CC) # Don't want to exclude "unsure" respondents from regression but this high value may skew effect size. Therefore, set "unsure" as 3 on 1-5 scale.
+wtp_raw$CC_10 <- ifelse(wtp_raw$CC_10 == 555, 3, wtp_raw$CC_10) # Don't want to exclude "unsure" respondents from regression but this high value may skew effect size. Therefore, set "unsure" as 3 on 1-5 scale.
 
-sum(wtp_raw$yy, na.rm = TRUE) # yy interchangeable with any variable for sum stats
+table(wtp_raw$dist) # column is interchangeable with any variable for sum stats
+(table(wtp_raw$dist)/sum(!is.na(wtp_raw$dist)))*100
+
 
 ##### Plotting regression results
 
