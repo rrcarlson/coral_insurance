@@ -1,5 +1,5 @@
 ##### Coral insurance WTP analysis
-##### 29 June 2022
+##### Start date of analysis: 29 June 2022
 ##### Author: Rachel Carlson, rrcarl@stanford.edu
 
 # Creates summary statistics on coastal businesses in Oahu and Hawaii Island
@@ -30,7 +30,7 @@ wtp <- read.csv("/Users/rachelcarlson/Documents/Research/PhD-2018-2022/Coral_Ins
 wtp <- wtp %>% select(-c(address, lat_land, lon_land, lat_shore, lon_shore, loc_sea, lat_sea, lon_sea)) # Remove geospatial
 wtp <- wtp %>% select(-email)
 
-# Some irregularities in "island" and other variables
+# Some typos in "island" and other variables
 unique(wtp$island)
 wtp$island <- ifelse(wtp$island == "Hawaii\tNorth Kona","Hawaii", wtp$island) # Fix mistake
 wtp$island <- ifelse(wtp$island == "", NA, wtp$island) # Translate blank to NA
@@ -50,10 +50,10 @@ wtp <- wtp %>% filter(Name != "Kama'aina Kids Kayak and Snorkel Eco-ventures")
 ##### Summary statistics
 
 ##### WTP
-sum(!is.na(wtp$ans1)) # 15 businesses left WTP blank, so we have a sample size of n = 179 for this formula
-wtp <- wtp %>% filter(!is.na(BID1.25)) # BID1.25 is a column signifying y/n to 1/8 of 1% of annual revenue. Those with NA in 1.25 have NA for WTP in general (no respondent gave answer to just one bid).
+sum(!is.na(wtp$ans1)) # Filter out businesses with NA data for WTP response
+wtp <- wtp %>% filter(!is.na(BID1.25)) # BID1.25 is a column signifying y/n to 1/8 of 1% of annual revenue. Those with NA in 1/8 of 1% level have NA for WTP in general.
 
-# Trim dataset to core variables in model
+# Test Pearson's correlation between continuous covariates
 wtp_corr <- wtp
 wtp_corr$island_num <- ifelse(wtp_corr$island == "Hawaii", 1, 0)
 wtp_corr <- wtp_corr[,c("CC", "size_rev", "influence", "econ_1", "econ_2","pro_nat1","pro_soc","age","island_num", "res")]
@@ -81,16 +81,17 @@ pairs.panels(wtp_corr,
              ellipses = TRUE # show correlation ellipses
 )
 
-# No problematic correlations detected
+# No problematic correlations detected, all correlations r<0.7
 
-# Check for correlations between categorical variables
-# First, define some new variables that you will need for analysis.
+# Define some variables for use in WTP model: 1) proximity redefined as binary "close" and "far" (close = on reef OR beachfront, far = inland); 2) industry redefined as recreation surface, recreation subsurface, and land (rather than subdividing land-based industries into retail, restaurants, etc.)
 wtp$Close <- ifelse(wtp$prox == "Close" | wtp$prox == "Beachfront", 1, 0) # Redefine proximity as close or far
 wtp$industry2 <- ifelse((wtp$industry1 == "Retail" | wtp$industry1 == "Restaurant" | wtp$industry1 == "Lodging"), "Land", 
                         ifelse(wtp$industry1 == "Recreation surface", "Recreation surface",
                                ifelse(wtp$industry1 == "Recreation subsurface", "Recreation subsurface", 0))) # Redefine industry as recreation "surface", recreation "subsurface" or land-based
-wtp$islandOahu <- ifelse(wtp$island == "Oahu" | wtp$island == "Multi", 1, 0) # If I want to define "multi" island as inclusive of both Hawaii and Oahu, not a third category
 
+
+
+# Check for correlations between categorical variables
 wtp_corr2 <- wtp
 wtp_corr2$island_num <- ifelse(wtp_corr2$island == "Hawaii", 1, 0)
 wtp_corr2 <- wtp_corr2[,c("dist","identity","gender","island","Close","industry2","CC", "size_rev", "influence", "econ_1", "econ_2","pro_nat1","pro_soc","age","island_num", "res", "tenure")]
@@ -101,51 +102,41 @@ wtp_corr2_cat <- wtp_corr2 %>% select(c(dist, identity, gender, island, Close, i
 wtp_corr2_cat <- na.omit(wtp_corr2_cat)
 wtp_corr2_cat[] <- lapply(wtp_corr2_cat, as.factor)
 # Do the following for all variables
-chisq.test(wtp_corr2_cat$dist, wtp_corr2_cat$industry2) # Dist not independent from industry2, island, or identity
-chisq.test(wtp_corr2_cat$identity, wtp_corr2_cat$industry2) # Identity is independent from everything but dist
-chisq.test(wtp_corr2_cat$gender, wtp_corr2_cat$industry2) # Gender is not independent from industry2
-chisq.test(wtp_corr2_cat$island, wtp_corr2_cat$industry2) # Island is independent from everything but dist
-chisq.test(wtp_corr2_cat$Close, wtp_corr2_cat$industry2) # Distance is not independent from industry2
-# "We found that gender was not independent from industry (certain industries were male- or female-dominated) and distribution method was correlated with several variables (industry, island, and identity), so we removed both gender and distribution method from analysis
+chisq.test(wtp_corr2_cat$dist, wtp_corr2_cat$industry2)
+chisq.test(wtp_corr2_cat$identity, wtp_corr2_cat$industry2)
+chisq.test(wtp_corr2_cat$gender, wtp_corr2_cat$industry2)
+chisq.test(wtp_corr2_cat$island, wtp_corr2_cat$industry2)
+chisq.test(wtp_corr2_cat$Close, wtp_corr2_cat$industry2)
+
 # Convert categorical binary variables to 0, 1 to prepare for Point Biserial Correlation test
 wtp_corr2$hawaiian <- ifelse(wtp_corr2$identity == "Native", 1, 0)
 wtp_corr2$big <- ifelse(wtp_corr2$island == "Hawaii", 1, 0)
-cor.test(wtp_corr2$pro_nat1, wtp_corr2$hawaiian) # Hawaiian identity is not correlated with pro_nat1
-cor.test(wtp_corr2$res, wtp_corr2$hawaiian) # Hawaiian identity is correlated with years on island, but not > 0.70
-cor.test(wtp_corr2$tenure, wtp_corr2$hawaiian) # Hawaiian identity is correlated with years on island, but not > 0.70. No other Hawaiian correlation.
-cor.test(wtp_corr2$influence, wtp_corr2$big) # Big island associated with influence and age but not > 0.70
+cor.test(wtp_corr2$pro_nat1, wtp_corr2$hawaiian) # Hawaiian identity of business owner is not correlated with pro_nat1 (p>0.05).
+cor.test(wtp_corr2$res, wtp_corr2$hawaiian) # Hawaiian identity correlation with years on island r=0.29 (acceptable).
+cor.test(wtp_corr2$tenure, wtp_corr2$hawaiian) # Hawaiian identity is not correlated with years with company (p>0.05).
+cor.test(wtp_corr2$influence, wtp_corr2$big)  # Big island correlation with age of respondent r=0.21 (acceptable).
 
-# Get rid of "close", "dist", and "gender"
 
-##### Done with testing - now analysis
-# Convert response variables to factors
-wtp_m1 <- wtp %>% filter(!is.na(BID1.25))
-# Several people were reluctant to report revenue. Must exclude those since need revenue data in model
-wtp_m1 <- wtp_m1 %>% filter(!is.na(size_rev))
 
-wtp_m1$BID5 <- as.factor(wtp_m1$BID5)
-wtp_m1$BID2.5 <- as.factor(wtp_m1$BID2.5)
-wtp_m1$BID1.25 <- as.factor(wtp_m1$BID1.25)
-
-##### Redefine dataset to include only the variables I am testing
+############### WTP Analysis
 
 ##### Dataset for model
 wtp_ms <- wtp[,c("dist", "res", "identity", "age", "gender", "island", "Close", "CC", "industry2", "size_rev", "tenure", "econ_1", "econ_2.1","pro_nat1","pro_soc", "BID1.25", "BID2.5", "BID5")]
-# wtp_ms$islandHawaii <- ifelse(wtp_ms$island == "Hawaii" | wtp_ms$island == "Multi", 1, 0)
 
-wtp_ms <- na.omit(wtp_ms) # n = 171
+wtp_ms <- na.omit(wtp_ms) # n=171 businesses had no NA values in any covariate above (line 124)
 wtp_ms[sapply(wtp_ms, is.character)] <- lapply(wtp_ms[sapply(wtp_ms, is.character)], 
                                                as.factor)
 # Rename outcome as "y" (required by "bestglm()" function)
-wtp_ms_1.25 <- wtp_ms %>% select(-c(BID2.5, BID5, gender, Close, dist)) %>% rename(y = BID1.25)
-wtp_ms_2.5 <- wtp_ms %>% select(-c(BID1.25, BID5, gender, Close, dist)) %>% rename(y = BID2.5)
-wtp_ms_5 <- wtp_ms %>% select(-c(BID1.25, BID2.5, gender, Close, dist)) %>% rename(y = BID5)
+wtp_ms_1.25 <- wtp_ms %>% select(-c(BID2.5, BID5)) %>% rename(y = BID1.25) # select response variable as 1.25 (1/8 of 1% revenue) payment level
+wtp_ms_2.5 <- wtp_ms %>% select(-c(BID1.25, BID5)) %>% rename(y = BID2.5) # select response variable as 2.5 (1/4 of 1% revenue) payment level
+wtp_ms_5 <- wtp_ms %>% select(-c(BID1.25, BID2.5)) %>% rename(y = BID5) # select response variable as 5 (1/2 of 1% revenue) payment level
 
 
-##### Try a preliminary model
+##### Preliminary model (all covariates included)
 glm.fits <- glm(BID5 ~ dist + res + gender + identity + age + island + CC + industry2 + Close + size_rev + pro_nat1 + econ_1 + econ_2.1 + pro_soc + tenure, 
                 family = binomial,
                 data = wtp_ms)
+# Reran the above with BID5 replaced with BID2.5, BID5 for 3 payment level models
 
 # Predict outcome based on model coefficients
 glm.probs <- predict(glm.fits_5, type = "response")
@@ -156,7 +147,7 @@ table(glm.pred, wtp_m1$BID2.5)
 
 ##### Best subset selection for WTP = 1/8 of 1%
 # First convert characters to factors since bestglm doesn't take characters.
-col_names <- c("identity","island","industry2")
+col_names <- c("identity","island","industry2","gender","Close","dist")
 wtp_ms_1.25[col_names] <- lapply(wtp_ms_1.25[col_names] , factor)
 
 best.logit <- bestglm(wtp_ms_1.25,
@@ -178,7 +169,7 @@ hl_1.25 # p-value = 0.913, so there is no evidence of poor fit
 wtp_ms_2.5[col_names] <- lapply(wtp_ms_2.5[col_names] , factor)
 
 best.logit2 <- bestglm(wtp_ms_2.5,
-                      IC = "AIC",                 # Information criteria for
+                      IC = "AIC",                
                       family=binomial,
                       method = "exhaustive")
 summary(best.logit2$BestModel)
@@ -196,7 +187,7 @@ hl_2.5 # p-value = 0.752, so there is no evidence of poor fit
 wtp_ms_5[col_names] <- lapply(wtp_ms_5[col_names] , factor)
 
 best.logit3 <- bestglm(wtp_ms_5,
-                      IC = "AIC",                 # Information criteria for
+                      IC = "AIC",                 
                       family=binomial,
                       method = "exhaustive")
 summary(best.logit3$BestModel)
@@ -221,7 +212,7 @@ glm.fits_rp <- glm(Revealed ~ dist + res + gender + identity + age + island + CC
 # Best subset selection for revealed preference behavior
 wtp_ms_rp <- wtp_rp %>% rename(y = Revealed)
 best.logit_rp <- bestglm(wtp_rp,
-                       IC = "AIC",                 # Information criteria for
+                       IC = "AIC",                
                        family=binomial,
                        method = "exhaustive")
 summary(best.logit_rp$BestModel)
@@ -233,128 +224,4 @@ glm.fits_rp <- glm(Revealed ~ age + island + pro_soc,
 summary(glm.fits_rp)
 hl_rp <- hoslem.test(glm.fits_rp$y, fitted(glm.fits_rp), g=10) # Hosmer and Lemeshow goodness of fit (GOF) test
 hl_rp # p-value = 0.7985, so there is no evidence of poor fit
-
-##### Descriptive statistics
-# We don't need to cancel all rows with NA values to create summary statistics, so revert to raw dataset (with some labels cleaned)
-wtp_raw <- read.csv("/Users/rachelcarlson/Documents/Research/PhD-2018-2022/Coral_Insurance/Data/business_wtp.csv")
-
-wtp_raw$island <- ifelse(wtp_raw$island == "Hawaii\tNorth Kona","Hawaii", wtp_raw$island) # Fix mistake
-wtp_raw$island <- ifelse(wtp_raw$island == "", NA, wtp_raw$island) # Translate blank to NA
-wtp_raw$prox <- ifelse(wtp_raw$prox == "Close to (<1 mile)", "Close", wtp_raw$prox)
-wtp_raw$dist <- ifelse(wtp_raw$dist == "in person " | wtp_raw$dist == "in", "in person", wtp_raw$dist)
-wtp_raw$gender <- ifelse(wtp_raw$gender == "", "Other", wtp_raw$gender)
-wtp_raw$industry1 <- ifelse(wtp_raw$industry1 == "Recreational surface", "Recreation surface", wtp_raw$industry1)
-wtp_raw$industry2 <- ifelse((wtp_raw$industry1 == "Retail" | wtp_raw$industry1 == "Restaurant" | wtp_raw$industry1 == "Lodging"), "Land", 
-                        ifelse(wtp_raw$industry1 == "Recreation surface", "Recreation surface",
-                               ifelse(wtp_raw$industry1 == "Recreation subsurface", "Recreation subsurface", 0)))
-wtp_raw <- wtp_raw %>% filter(Name != "Guava Shop Haleiwa")
-wtp_raw <- wtp_raw %>% filter(Name != "Kama'aina Kids Kayak and Snorkel Eco-ventures")
-wtp_raw$CC <- ifelse(wtp_raw$CC == 555, 3, wtp_raw$CC) # Don't want to exclude "unsure" respondents from regression but this high value may skew effect size. Therefore, set "unsure" as 3 on 1-5 scale.
-wtp_raw$CC_10 <- ifelse(wtp_raw$CC_10 == 555, 3, wtp_raw$CC_10) # Don't want to exclude "unsure" respondents from regression but this high value may skew effect size. Therefore, set "unsure" as 3 on 1-5 scale.
-
-table(wtp_raw$dist) # column is interchangeable with any variable for sum stats
-(table(wtp_raw$dist)/sum(!is.na(wtp_raw$dist)))*100
-
-
-##### Plotting regression results
-
-# Plot pro_nat1 relationships to BID
-# First, create a dataset just for plotting
-plot_df <- wtp_ms
-plot_df <- plot_df %>% mutate(yes5 = ifelse(BID5 == 1, pro_nat1, NA),
-                              no5 = ifelse(BID5 == 0, pro_nat1, NA),
-                              yes2.5 = ifelse(BID2.5 == 1, pro_nat1, NA),
-                              no2.5 = ifelse(BID2.5 == 0, pro_nat1, NA),
-                              yes1.25 = ifelse(BID1.25 == 1, pro_nat1, NA),
-                              no1.25 = ifelse(BID1.25 == 0, pro_nat1, NA))
-
-# Create dataset of sequential values of pro_nat1 matched with predictions for y
-Predicted_data <- data.frame(pro_nat1=seq(
-  0, 20,len=500))
-# Fill predicted y using univariate regression model
-glm_pro_nat5 <- glm(BID5 ~ pro_nat1, family = binomial, data = wtp_ms)
-glm_pro_nat2.5 <- glm(BID2.5 ~ pro_nat1, family = binomial, data = wtp_ms)
-glm_pro_nat1.25 <- glm(BID1.25 ~ pro_nat1, family = binomial, data = wtp_ms)
-
-Predicted_data$y5 = predict(glm_pro_nat5, Predicted_data, type="response")
-Predicted_data$y2.5 = predict(glm_pro_nat2.5, Predicted_data, type="response")
-Predicted_data$y1.25 = predict(glm_pro_nat1.25, Predicted_data, type="response")
-
-# pro_nat1 v. BID5
-base <- ggplot() +
-  #geom_point(data = wtp_ms, aes(x=pro_nat1, y=BID5), color = "orange", shape = "circle", size = 1) +
-  geom_line(data = Predicted_data, aes(x=pro_nat1, y=y5), linetype = "solid", size = 0.8, color="skyblue4") +
-  geom_rug(data = plot_df, aes(x = no5), sides = "b", alpha = 1, color = "red") +
-  geom_rug(data = plot_df, aes(x = yes5), sides = "t", alpha = 1, color = "red") +
-  labs(x = "Pro-nature values", y = "WTP (yes/no)") +
-  theme_hc() +
-  ylim(0,1)
-
-# pro_nat1 v. BID2.5
-base2 <- base +
-  #geom_point(data = wtp_ms, aes(x=pro_nat1, y=BID5), color = "orange", shape = "circle", size = 1) +
-  geom_line(data = Predicted_data, aes(x=pro_nat1, y=y2.5), linetype = "solid", size = 0.8, color="skyblue3") +
-  geom_rug(data = plot_df, aes(x = no2.5), sides = "b", alpha = 1, color = "orange") +
-  geom_rug(data = plot_df, aes(x = yes2.5), sides = "t", alpha = 1, color = "orange")
-
-# pro_nat1 v. BID1.25
-base2 +
-  #geom_point(data = wtp_ms, aes(x=pro_nat1, y=BID5), color = "orange", shape = "circle", size = 1) +
-  geom_line(data = Predicted_data, aes(x=pro_nat1, y=y1.25), linetype = "solid", size = 0.8, color="skyblue2") +
-  geom_rug(data = plot_df, aes(x = no1.25), sides = "b", alpha = 1, color = "orange") +
-  geom_rug(data = plot_df, aes(x = yes1.25), sides = "t", alpha = 1, color = "orange")
-
-# Plot seniority (`tenure`) and ethnicity v. BID
-# Since these are ordinal variables, we'll have to use a different approach to show trends
-# Create spineplots to show relationship between two ordinal vars
-# Create another dataset just for plotting
-plot_df2 <- wtp_ms
-plot_df2$maxWTP <- ifelse(plot_df2$BID5 == 1, "0.5%",
-                          ifelse(plot_df2$BID1.25 == 1, "0.125 - 0.25%", "0"))
-plot_df2$Kamaina <- ifelse(plot_df2$identity == "Kamaina", "Yes", "No")
-plot_df2 <- plot_df2 %>% filter(identity != "Other") # There are only 2 "Other" so it messes with the color palette sorting and isn't visible anyway
-
-# Customize labels and colors of spineplots
-Zissou <- as.vector(wes_palette("Zissou1"))
-Zissou2 <- c("#3B9AB2","#78B7C5","#E1AF00","#F21A00")
-
-# Shading color palette (requested by Gretchen)
-shading <- c("#9DD3EB","#98BAD9","#7D92B8","#59638F","#3E395E")
-shading2 <- c("#4f4140","#9DD3EB","#98BAD9","#59638F")
-
-spineplot(factor(plot_df2$tenure)~factor(plot_df2$maxWTP), col = shading, ylevels = c(5,4,3,2,1))
-spineplot(factor(plot_df2$identity)~factor(plot_df2$maxWTP), col = shading2, ylevels = c("Native","Kamaina","Born","Temporary or seasonal"))
-# Labels don't show up well so--Hawaiian = red, Born = light blue, Kamaina = yellow, Temp = dark blue
-
-
-
-##### Scrap
-# Backwards selection
-# glm.fits <- glm(BID2.5 ~ dist + res + gender + identity + age + island + CC + industry2 + Close + size_rev + pro_nat1 + econ_1 + econ_2.1 + pro_soc + tenure, 
-#                 family = binomial,
-#                 data = wtp_ms)
-# deviance(glm.fits) # 192.1054
-# 
-# glm.fits2 <- glm(BID2.5 ~ dist + res + gender + identity + age + island + CC + industry2 + Close + size_rev + pro_nat1 + econ_1 + econ_2.1 + tenure, 
-#                  family = binomial,
-#                  data = wtp_ms) # Eliminated "pro_soc"
-# deviance(glm.fits2) # 192.21
-# 
-# glm.fits3 <- glm(BID2.5 ~ dist + res + gender + identity + island + CC + industry2 + Close + size_rev + pro_nat1 + econ_1 + econ_2.1 + tenure, 
-#                  family = binomial,
-#                  data = wtp_ms) # Eliminated "age"
-# deviance(glm.fits3) #192.293
-# 
-# glm.fits4 <- glm(BID2.5 ~ dist + res + gender + identity + island + CC + industry2 + Close + size_rev + pro_nat1 + econ_1 + tenure, 
-#                  family = binomial,
-#                  data = wtp_ms) # Eliminated "econ_2.1"
-# deviance(glm.fits4) #192.307
-# 
-# glm.fits4 <- glm(BID2.5 ~ dist + res + gender + identity + island + CC + industry2 + Close + size_rev + pro_nat1 + econ_1 + tenure, 
-#                  family = binomial,
-#                  data = wtp_ms)
-# deviance(glm.fits4)
-
-
-
 
