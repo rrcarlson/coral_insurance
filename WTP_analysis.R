@@ -1,6 +1,6 @@
 ##### Coral insurance WTP analysis
 ##### Start date of analysis: 29 June 2022
-##### Author: Rachel Carlson, rrcarl@stanford.edu
+##### Author: Rachel Carlson, rrcarlson@ucdavis.edu
 
 # Creates summary statistics on coastal businesses in Oahu and Hawaii Island
 # Cleans WTP dataset for use in analysis
