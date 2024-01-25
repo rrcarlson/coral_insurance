@@ -1,6 +1,6 @@
 ##### Coral insurance geospatial analysis
-##### 31 May 2022
-##### Author: Rachel Carlson, rrcarl@stanford.edu
+##### Start of analysis: 31 May 2022
+##### Author: Rachel Carlson, rrcarlson@ucdavis.edu
 
 # Rescales coral health and value layers for the Big Island and Oahu
 # Attributes coral health and value data to n=202 business locations in Hawaii
