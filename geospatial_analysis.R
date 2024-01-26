@@ -23,7 +23,8 @@ NAvalue(GAO_Hawaii) <- 255
 NAvalue(GAO_Oahu) <- 255
 NAvalue(GAO_Kauai) <- 255
 NAvalue(GAO_Maui) <- 255
-##### Backup coral health: PacIOOS summed for all species
+
+##### Backup coral health: PacIOOS summed for all species. (There are a few small gaps in GAO in Oahu that we need to impute from PacIOOS.)
 
 # List files belonging to individual species
 Pac_ls <- list.files("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/PacIOOS_CC/all_spp/",
@@ -47,7 +48,7 @@ Pac_Maui <- crop(Pac_sum, Maui_clip)
 
 rec_all <- st_read("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/Spalding/MOW_Global_Coral_Tourism_Jan2017_Total_Dollar_Value_Poly_Equal_Area_clip.shp")
 # Clip `rec_all` to Oahu and Big Island separately
-rec_all <- rec_all %>% st_transform(crs = crs(Big_clip)) # Ensure clip bbox and shapefile have same projection
+rec_all <- rec_all %>% st_transform(crs = crs(Big_clip)) # Ensure clip bbox and shapefile have same projection (use crs of Big Island as template)
 rec_Oahu <- st_crop(rec_all, st_bbox(Oahu_clip)) # Crop layer to clip box
 rec_Big <- st_crop(rec_all, st_bbox(Big_clip))
 rec_Kauai <- st_crop(rec_all, st_bbox(Kauai_clip))
@@ -55,25 +56,26 @@ rec_Maui <- st_crop(rec_all, st_bbox(Maui_clip))
 
 ##### Rescale all layers based on 5 quantiles
 
-# Resample GAO raster since it's too large to calculate quantiles
-GAO_HI_40 <- raster("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/Spatial/Basemaps/GAO_Hawaii_merged_40m.tif")
-GAO_Oahu_40 <- raster("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/Spatial/Basemaps/GAO_Oahu_40m.tif")
-GAO_Kauai_40 <- raster("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/Spatial/Basemaps/GAO_Kauai_40m.tif")
-GAO_Maui_40 <- raster("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/Spatial/Basemaps/GAO_Maui_40m.tif")
+# If GAO rasters are too large to calculate quantiles locally, users can opt to resample GAO raster.
+# GAO_HI_40 <- raster("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/Spatial/Basemaps/GAO_Hawaii_merged_40m.tif")
+# GAO_Oahu_40 <- raster("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/Spatial/Basemaps/GAO_Oahu_40m.tif")
+# GAO_Kauai_40 <- raster("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/Spatial/Basemaps/GAO_Kauai_40m.tif")
+# GAO_Maui_40 <- raster("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/Spatial/Basemaps/GAO_Maui_40m.tif")
+
 # Determine quantile breaking points
-q_gao_hi <- raster::quantile(GAO_HI_40, probs = c(0.2, 0.4, 0.6, 0.8), names = FALSE, na.rm = TRUE)
-q_gao_oahu <- raster::quantile(GAO_Oahu_40, probs = c(0.2, 0.4, 0.6, 0.8), names = FALSE, na.rm = TRUE)
-q_gao_kauai <- raster::quantile(GAO_Kauai_40, probs = c(0.2, 0.4, 0.6, 0.8), names = FALSE, na.rm = TRUE)
-q_gao_maui <- raster::quantile(GAO_Maui_40, probs = c(0.2, 0.4, 0.6, 0.8), names = FALSE, na.rm = TRUE)
+q_gao_hi <- raster::quantile(GAO_HI, probs = c(0.2, 0.4, 0.6, 0.8), names = FALSE, na.rm = TRUE)
+q_gao_oahu <- raster::quantile(GAO_Oahu, probs = c(0.2, 0.4, 0.6, 0.8), names = FALSE, na.rm = TRUE)
+q_gao_kauai <- raster::quantile(GAO_Kauai, probs = c(0.2, 0.4, 0.6, 0.8), names = FALSE, na.rm = TRUE)
+q_gao_maui <- raster::quantile(GAO_Maui, probs = c(0.2, 0.4, 0.6, 0.8), names = FALSE, na.rm = TRUE)
 
 q_rec_hi <- quantile(rec_Big$val_per_ha, probs = c(0.2, 0.4, 0.6, 0.8), names = FALSE, na.rm = TRUE)
 q_rec_oahu <- quantile(rec_Oahu$val_per_ha, probs = c(0.2, 0.4, 0.6, 0.8), names = FALSE, na.rm = TRUE)
 q_rec_all <- quantile(rec_all$val_per_ha, probs = c(0.2, 0.4, 0.6, 0.8), names = FALSE, na.rm = TRUE)
 
-##### Load business data
+##### Load business data. Business data is private due to identifying information.
 bus <- read.csv("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/business_data.csv") %>%
   dplyr::filter(!is.na(lat_sea)) %>% 
-  st_as_sf(coords = c("lon_sea","lat_sea"), crs = "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0") %>% 
+  st_as_sf(coords = c("lon_sea","lat_sea"), crs = "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0") %>%  # Location information comes from location where they operate in the ocean. If they do not operate in the ocean, lon_sea and lat_sea reflects closest shoreline location. For evaluating flood data, we change geographic attributes to actual business location where most physical infrastructure is located. 
   mutate(ID = row_number())
 # Correct error in Island
 bus$island <- ifelse(bus$island == "Hawaii\tNorth Kona","Hawaii", bus$island)
@@ -81,99 +83,67 @@ bus$island <- ifelse(bus$island == "Hawaii\tNorth Kona","Hawaii", bus$island)
 ##### Coral health data
 
 # Shoreline commercial
-bus_buff_1k <- bus %>% dplyr::filter(is.na(loc_sea)) %>% # Select those locations with NA at loc_sea, which do not have "sea" locations
+bus_buff_1k <- bus %>% dplyr::filter(is.na(loc_sea)) %>% # Shoreline locations = those locations with NA at loc_sea
   st_buffer(1000) #%>% st_transform(crs = 4326) # Buffered within 1 km radius
 
-# Locations in the water, i.e., dive, snorkel, and fish and tackle shops
-bus_buff_200m <- bus %>% dplyr::filter(!is.na(loc_sea)) %>% # Select those locations without NA at loc_sea, which DO have "sea" locations
+# Locations in the water, i.e., dive, snorkel, and other marine operators
+bus_buff_200m <- bus %>% dplyr::filter(!is.na(loc_sea)) %>% # Ocean locations = locations with value (no NA) at loc_sea
   st_buffer(200) #%>% st_transform(crs = 4326)
 
 # Hawaii
 
-# First derive CC from GAO data for shoreline locations
+# First derive mean coral cover from GAO data for shoreline locations
 bus_1k_HI <- bus_buff_1k %>% filter(island == "Hawaii")
 bus_1k_HI <- bus_1k_HI %>% mutate(
-    ACC_mean = raster::extract(GAO_HI_40, bus_1k_HI, fun = mean, na.rm = TRUE),
-    ACC_max = raster::extract(GAO_HI_40, bus_1k_HI, fun = max, na.rm = TRUE))
+    ACC_mean = raster::extract(GAO_HI, bus_1k_HI, fun = mean, na.rm = TRUE),
+    ACC_max = raster::extract(GAO_HI, bus_1k_HI, fun = max, na.rm = TRUE))
 
 # Then for ocean locations
 bus_200m_HI <- bus_buff_200m %>% filter(island == "Hawaii")
 bus_200m_HI <- bus_200m_HI %>% mutate(
-  ACC_mean = raster::extract(GAO_HI_40, bus_200m_HI, fun = mean, na.rm = TRUE),
-  ACC_max = raster::extract(GAO_HI_40, bus_200m_HI, fun = max, na.rm = TRUE))
+  ACC_mean = raster::extract(GAO_HI, bus_200m_HI, fun = mean, na.rm = TRUE),
+  ACC_max = raster::extract(GAO_HI, bus_200m_HI, fun = max, na.rm = TRUE))
 
 # Oahu
 
-# First derive CC from GAO data. There will be gaps in GAO in Oahu.
+# First derive coral cover from GAO data. There will be gaps in GAO in Oahu that we need to impute from PacIOOS.
 bus_1k_Oahu <- bus_buff_1k %>% filter(island == "Oahu") 
 bus_1k_Oahu <- bus_1k_Oahu %>% dplyr::mutate(
-  ACC_mean = raster::extract(GAO_Oahu_40, bus_1k_Oahu, fun = mean, na.rm = TRUE),
-  ACC_max = raster::extract(GAO_Oahu_40, bus_1k_Oahu, fun = max, na.rm = TRUE))
+  ACC_mean = raster::extract(GAO_Oahu, bus_1k_Oahu, fun = mean, na.rm = TRUE),
+  ACC_max = raster::extract(GAO_Oahu, bus_1k_Oahu, fun = max, na.rm = TRUE))
 
 bus_200m_Oahu <- bus_buff_200m %>% filter(island == "Oahu") 
 bus_200m_Oahu <- bus_200m_Oahu %>% mutate(
-  ACC_mean = raster::extract(GAO_Oahu_40, bus_200m_Oahu, fun = mean, na.rm = TRUE),
-  ACC_max = raster::extract(GAO_Oahu_40, bus_200m_Oahu, fun = max, na.rm = TRUE))
+  ACC_mean = raster::extract(GAO_Oahu, bus_200m_Oahu, fun = mean, na.rm = TRUE),
+  ACC_max = raster::extract(GAO_Oahu, bus_200m_Oahu, fun = max, na.rm = TRUE))
 
-# Make sure to correct missing CC points via QGIS (below code does not work)
-st_write(bus_1k_Oahu, "/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/GAO_CC/bus_1k_Oahu.shp")
-st_write(bus_200m_Oahu, "/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/GAO_CC/bus_200m_Oahu.shp")
+# To fill in gaps in coral cover, need to impute coral cover data from PacIOOS where GAO data does not exist (there are a few small gaps). If this doesn't work in R due to sf version, can conduct this process in QGIS.
+for (i in 1:nrow(bus_1k_Oahu)) {
+   if (is.na(bus_1k_Oahu$ACC_mean[i]) == TRUE) {
+     bus_1k_Oahu$ACC_mean[i] = raster::extract(Pac_Oahu, bus_1k_Oahu, fun = mean, na.rm = TRUE)
+     bus_1k_Oahu$ACC_max[i] = raster::extract(Pac_Oahu, bus_1k_Oahu, fun = max, na.rm = TRUE)
+   }
+ }
+ 
+ for (i in 1:nrow(bus_200m_Oahu)) {
+   if (is.na(bus_200m_Oahu$ACC_mean[i]) == TRUE) {
+     bus_200m_Oahu$ACC_mean[i] = raster::extract(Pac_Oahu, bus_200m_Oahu[i], fun = mean, na.rm = TRUE)
+     bus_200m_Oahu$ACC_max[i] = raster::extract(Pac_Oahu, bus_200m_Oahu[i], fun = max, na.rm = TRUE)
+   }
+ }
 
-bus_1k_Oahu <- st_read("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/GAO_CC/bus_1k_Oahu_filled.shp")
-bus_200m_Oahu <- st_read("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/GAO_CC/bus_200m_Oahu_filled.shp")
-
-# For points where GAO is NA for CC, replace NA values with CC values from PacIOOS
-bus_1k_Oahu$ACC_mean <- ifelse(is.na(bus_1k_Oahu$ACC_mean), bus_1k_Oahu$X_mean*100, bus_1k_Oahu$ACC_mean)
-bus_1k_Oahu$ACC_max <- ifelse(is.infinite(bus_1k_Oahu$ACC_max), bus_1k_Oahu$X_max*100, bus_1k_Oahu$ACC_max)
-
-bus_200m_Oahu$ACC_mean <- ifelse(is.na(bus_200m_Oahu$ACC_mean), bus_200m_Oahu$X_mean*100, bus_200m_Oahu$ACC_mean)
-bus_200m_Oahu$ACC_max <- ifelse(is.infinite(bus_200m_Oahu$ACC_max), bus_200m_Oahu$X_max*100, bus_200m_Oahu$ACC_max)
-
-# QGIS changed column names, so change them back
-colnames(bus_200m_Oahu)[72] <- "ACC_mean"
-colnames(bus_1k_Oahu)[72] <- "ACC_mean"
-
-# To fill in gaps in CC, need to impute CC data from PacIOOS where GAO data does not exist
-# for (i in 1:nrow(bus_1k_Oahu)) {
-#   if (is.na(bus_1k_Oahu$ACC_mean[i]) == TRUE) {
-#     bus_1k_Oahu$ACC_mean[i] = raster::extract(Pac_Oahu, bus_1k_Oahu, fun = mean, na.rm = TRUE)
-#     bus_1k_Oahu$ACC_max[i] = raster::extract(Pac_Oahu, bus_1k_Oahu, fun = max, na.rm = TRUE)
-#   }
-# }
-# 
-# for (i in 1:nrow(bus_200m_Oahu)) {
-#   if (is.na(bus_200m_Oahu$ACC_mean[i]) == TRUE) {
-#     bus_200m_Oahu$ACC_mean[i] = raster::extract(Pac_Oahu, bus_200m_Oahu[i], fun = mean, na.rm = TRUE)
-#     bus_200m_Oahu$ACC_max[i] = raster::extract(Pac_Oahu, bus_200m_Oahu[i], fun = max, na.rm = TRUE)
-#   }
-# }
-
-# Kauai
-bus_1k_Kauai <- bus_buff_1k %>% filter(island == "Kauai") 
-bus_1k_Kauai <- bus_1k_Kauai %>% mutate(
-  ACC_mean = raster::extract(GAO_Kauai_40, bus_1k_Kauai, fun = mean, na.rm = TRUE),
-  ACC_max = raster::extract(GAO_Kauai_40, bus_1k_Kauai, fun = max, na.rm = TRUE))
-
-# Maui
-bus_1k_Maui <- bus_buff_1k %>% filter(island == "Maui") 
-bus_1k_Maui <- bus_1k_Maui %>% mutate(
-  ACC_mean = raster::extract(GAO_Maui_40, bus_1k_Maui, fun = mean, na.rm = TRUE),
-  ACC_max = raster::extract(GAO_Maui_40, bus_1k_Maui, fun = max, na.rm = TRUE))
-
-# Bind all datasets (each island, type of buffer) together
+# Bind all datasets (each island, type of buffer) together (note: "ACC" = "Actual Cover Cover").
 all <- do.call("rbind", list(bus_1k_HI[ , c("ID", "ACC_mean", "ACC_max")], 
-                             bus_1k_Oahu[ , c("ID", "ACC_mean", "ACC_max")], 
-                             bus_1k_Kauai[ , c("ID", "ACC_mean", "ACC_max")], 
-                             bus_1k_Maui[ , c("ID", "ACC_mean", "ACC_max")], 
+                             bus_1k_Oahu[ , c("ID", "ACC_mean", "ACC_max")],  
                              bus_200m_HI[ , c("ID", "ACC_mean", "ACC_max")], 
                              bus_200m_Oahu[ , c("ID", "ACC_mean", "ACC_max")])) %>% 
   as.data.frame() %>% select(-geometry)
 
-# Bind two CC variables back to original business dataset
+# Bind two coral cover variables back to original business dataset
 bus <- left_join(x = bus, y = all, by = "ID")
 
 ##### Value (rec) data
-rec_all_filtered <- rec_all %>% select(Total_Val, val_per_ha) # select only those rec value attributes I wish to join to bus
+rec_all_filtered <- rec_all %>% select(Total_Val, val_per_ha) # select only those recreational value attributes I wish to join to business dataset
 bus <- st_join(bus, rec_all_filtered) # spatial join
 
 bus <- bus %>% as.data.frame() %>% select(-geometry)
@@ -182,7 +152,7 @@ write.csv(bus, "/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/bus
 ##### Value (flood) data
 flood <- st_read("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/Reguero/Floodmasks/HawaiianIslands_floodpoints.shp")
 
-# Switch geometry to actual location (not shore- or sea-based)
+# Switch geometry to actual location where most infrastructure is located (not reef they visit with boats in the ocean, etc.).
 bus_land <- read.csv("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/business_sea.csv") %>%
   dplyr::filter(!is.na(lat_land)) %>% 
   st_as_sf(coords = c("lon_land","lat_land"), crs = "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")
