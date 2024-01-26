@@ -184,7 +184,7 @@ for (i in 1:nrow(bus_land)) {
 
 # The above is based on flood gauge points, where we tagged the nearest point to businesses
 # However, businesses may be NEAR a flood point without being inside the floodplain
-# We want to excuse those businesses outside the floodplain
+# We want to determine those businesses inside v. outside the floodplain
 
 # Load floodplain shapefile
 flood_shp <- st_read("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/Reguero/Floodmasks/HawaiianIslands_floodmasks.shp")
@@ -244,7 +244,7 @@ mean(ifelse(bus_land$fp_100_diff > 0, 1, 0) * (bus_land$worf_500 - bus_land$wrf_
 range(ifelse(bus_land$fp_100_diff > 0, 1, 0) * (bus_land$worf_500 - bus_land$wrf_500), na.rm = TRUE) # 0 - 1.43
 
 # Number of businesses with increased risk
-sum(bus_land$fl_val_10 > 1) # 116 under 10y storm
+sum(bus_land$fl_val_10 > 1) # 114 under 10y storm
 sum(bus_land$fl_val_50 > 1) # 119 under 50y storm
 sum(bus_land$fl_val_100 > 1) # 120 under 100y storm
 sum(bus_land$fl_val_500 > 1) # 128 under 500y storm
@@ -261,13 +261,13 @@ bus_land$fl_score_100 <- bus_land$Q16_4 - bus_land$fl_val_100
 bus_land$fl_score_500 <- bus_land$Q16_4 - bus_land$fl_val_500
 
 # Mean under/over- estimate per storm return period
-mean(bus_land$fl_score_10, na.rm = TRUE) # -0.1484375
-mean(bus_land$fl_score_50, na.rm = TRUE) # -0.1953125
-mean(bus_land$fl_score_100, na.rm = TRUE) # -0.2109375
-mean(bus_land$fl_score_500, na.rm = TRUE) # -0.3359375
+mean(bus_land$fl_score_10, na.rm = TRUE)
+mean(bus_land$fl_score_50, na.rm = TRUE)
+mean(bus_land$fl_score_100, na.rm = TRUE)
+mean(bus_land$fl_score_500, na.rm = TRUE)
 
 ##### Value (recreation)
-# Find index for over- and under-estimates. Negative scores = underestimates, positive = overestimates
+# Find index for over- and under-estimates. Negative scores = underestimates, positive = overestimates. Cutoffs of rec value taken from quantile breaking points determined above.
 bus$rec_scaled[bus$island == "Hawaii" & bus$val_per_ha <= 68936] <- 1
 bus$rec_scaled[bus$island == "Hawaii" & bus$val_per_ha > 68936 & bus$val_per_ha <= 73160] <- 2
 bus$rec_scaled[bus$island == "Hawaii" & bus$val_per_ha > 73160 & bus$val_per_ha <= 117608] <- 3
@@ -280,20 +280,13 @@ bus$rec_scaled[bus$island == "Oahu" & bus$val_per_ha > 6656 & bus$val_per_ha <= 
 bus$rec_scaled[bus$island == "Oahu" & bus$val_per_ha > 11384 & bus$val_per_ha <= 22784] <- 4
 bus$rec_scaled[bus$island == "Oahu" & bus$val_per_ha > 22784] <- 5
 
-bus$rec_scaled[bus$island == "Maui" | bus$island == "Kauai" & bus$val_per_ha <= 4744] <- 1
-bus$rec_scaled[bus$island == "Maui" | bus$island == "Kauai" & bus$val_per_ha > 4744 & bus$val_per_ha <= 7000] <- 2
-bus$rec_scaled[bus$island == "Maui" | bus$island == "Kauai" & bus$val_per_ha > 7000 & bus$val_per_ha <= 15960] <- 3
-bus$rec_scaled[bus$island == "Maui" | bus$island == "Kauai" & bus$val_per_ha > 15960 & bus$val_per_ha <= 38568] <- 4
-bus$rec_scaled[bus$island == "Maui" | bus$island == "Kauai" & bus$val_per_ha > 38568] <- 5
-
 mean(bus$rec_scaled, na.rm = TRUE)
-# If 2 central questions
 bus$rec_score <- (bus$Q16_2 + bus$Q16_5)/2 - bus$rec_scaled
 bus$rec_perc <- (bus$Q16_2 + bus$Q16_5)/2
-mean(bus$rec_score, na.rm = TRUE) # -0.98
-quantile(bus$rec_score, na.rm = TRUE) # 75% of businesses underestimated flood risk
+mean(bus$rec_score, na.rm = TRUE)
 
-##### Reef health
+
+##### Reef health. Cutoffs of rescaling index (1-5) taken from quantile breaking points determined above (q_gao_hi and q_gao_oahu)
 bus$ACC_mean <- as.numeric(bus$ACC_mean)
 bus$ACC_mean_scaled[bus$island == "Hawaii" & bus$ACC_mean <= q_gao_hi[1]] <- 1
 bus$ACC_mean_scaled[bus$island == "Hawaii" & bus$ACC_mean > q_gao_hi[1] & bus$ACC_mean <= q_gao_hi[2]] <- 2
@@ -307,40 +300,33 @@ bus$ACC_mean_scaled[bus$island == "Oahu" & bus$ACC_mean > q_gao_oahu[2] & bus$AC
 bus$ACC_mean_scaled[bus$island == "Oahu" & bus$ACC_mean > q_gao_oahu[3] & bus$ACC_mean <= q_gao_oahu[4]] <- 4
 bus$ACC_mean_scaled[bus$island == "Oahu" & bus$ACC_mean > q_gao_oahu[4]] <- 5
 
-bus$ACC_mean_scaled[bus$island == "Maui" & bus$ACC_mean <= q_gao_maui[1]] <- 1
-bus$ACC_mean_scaled[bus$island == "Maui" & bus$ACC_mean > q_gao_maui[1] & bus$ACC_mean <= q_gao_maui[2]] <- 2
-bus$ACC_mean_scaled[bus$island == "Maui" & bus$ACC_mean > q_gao_maui[2] & bus$ACC_mean <= q_gao_maui[3]] <- 3
-bus$ACC_mean_scaled[bus$island == "Maui" & bus$ACC_mean > q_gao_maui[3] & bus$ACC_mean <= q_gao_maui[4]] <- 4
-bus$ACC_mean_scaled[bus$island == "Maui" & bus$ACC_mean > q_gao_maui[4]] <- 5
 
-bus$ACC_mean_scaled[bus$island == "Kauai" & bus$ACC_mean <= q_gao_kauai[1]] <- 1
-bus$ACC_mean_scaled[bus$island == "Kauai" & bus$ACC_mean > q_gao_kauai[1] & bus$ACC_mean <= q_gao_kauai[2]] <- 2
-bus$ACC_mean_scaled[bus$island == "Kauai" & bus$ACC_mean > q_gao_kauai[2] & bus$ACC_mean <= q_gao_kauai[3]] <- 3
-bus$ACC_mean_scaled[bus$island == "Kauai" & bus$ACC_mean > q_gao_kauai[3] & bus$ACC_mean <= q_gao_kauai[4]] <- 4
-bus$ACC_mean_scaled[bus$island == "Kauai" & bus$ACC_mean > q_gao_kauai[4]] <- 5
-
-# Rescale all based on literature of "healthy" coral cover.
+# Rescale reef health instead based on literature of baseline "healthy" coral cover.
 # Historical average for the Indo-Pacific is 36% (Bruno and Selig, 2007: https://doi.org/10.1371/journal.pone.0000711)
 # >10% change is considered a "major" shift in absolute coral cover
-# Average coral cover in HI at 152 reef stations in XX was 20.3% (Friedlander et al., 2008: "The state of coral reef ecosystems of the main Hawaiian Islands")
+# Average coral cover in HI at 152 reef stations was 20.3% in Friedlander et al., 2008: "The state of coral reef ecosystems of the main Hawaiian Islands"
+# Based on these studies, 20 is considered the midway point ("average" condition) of scores 1-5. Since 10% change is a "major" shift, <5% cover represents our threshold for score = 1 and >35% for score = 5.
 q_lit_all <- c(5, 15, 25, 35)
 
+# Mean rescaled coral cover within buffer zone of businesses
 bus$ACC_mean_scaled_2[bus$ACC_mean <= q_lit_all[1]] <- 1
 bus$ACC_mean_scaled_2[bus$ACC_mean > q_lit_all[1] & bus$ACC_mean <= q_lit_all[2]] <- 2
 bus$ACC_mean_scaled_2[bus$ACC_mean > q_lit_all[2] & bus$ACC_mean <= q_lit_all[3]] <- 3
 bus$ACC_mean_scaled_2[bus$ACC_mean > q_lit_all[3] & bus$ACC_mean <= q_lit_all[4]] <- 4
 bus$ACC_mean_scaled_2[bus$ACC_mean > q_lit_all[4]] <- 5
 
+# Max rescaled coral cover within buffer zone of businesses
 bus$ACC_max_scaled_2[bus$ACC_max <= q_lit_all[1]] <- 1
 bus$ACC_max_scaled_2[bus$ACC_max > q_lit_all[1] & bus$ACC_max <= q_lit_all[2]] <- 2
 bus$ACC_max_scaled_2[bus$ACC_max > q_lit_all[2] & bus$ACC_max <= q_lit_all[3]] <- 3
 bus$ACC_max_scaled_2[bus$ACC_max > q_lit_all[3] & bus$ACC_max <= q_lit_all[4]] <- 4
 bus$ACC_max_scaled_2[bus$ACC_max > q_lit_all[4]] <- 5
 
-mean(bus$ACC_mean_scaled, na.rm = TRUE)
-mean(bus$ACC_mean_scaled_2, na.rm = TRUE)
+# Summary statistics
+mean(bus$ACC_mean_scaled, na.rm = TRUE) # based on intra-island quantiles
+mean(bus$ACC_mean_scaled_2, na.rm = TRUE) # based on historical baseline
 
-# Rescale perception Q
+# Code perception of coral cover on Likert Scale
 bus$CC <- ifelse(bus$CC == "Uhealthy","Unhealthy", bus$CC) # Correct typos
 bus$CC <- ifelse(bus$CC == "Unhealthy (though some spots healthy--reflection on amount of fish, not coral)","Unhealthy", bus$CC)
 bus$CC <- ifelse(bus$CC == "Unsure", NA, bus$CC)
@@ -354,44 +340,18 @@ bus$CC[bus$CC == "Very healthy"] <- 5
 bus$CC <- as.numeric(bus$CC)
 mean(bus$CC, na.rm = TRUE)
 
-# Direction of change in the last ten years?
-bus$CC_10 <- ifelse(bus$CC_10 == "Very Healthy" | bus$CC_10 == "Very health","Very healthy", bus$CC_10) # Correct typos
-bus$CC_10 <- ifelse(bus$CC_10 == "Unsure", NA, bus$CC_10)
-
-bus$CC_10[bus$CC_10 == "Very unhealthy"] <- 1 # Rescale
-bus$CC_10[bus$CC_10 == "Unhealthy"] <- 2
-bus$CC_10[bus$CC_10 == "Fair"] <- 3
-bus$CC_10[bus$CC_10 == "Healthy"] <- 4
-bus$CC_10[bus$CC_10 == "Very healthy"] <- 5
-
-# Mean CC 10 years ago
-bus$CC_10 <- as.numeric(bus$CC_10)
-
-# Change in CC from 10 years ago
-bus$CC_diff_10 <- bus$CC - bus$CC_10
-
-# Mean change in CC
-mean(bus$CC_diff_10, na.rm = TRUE)
-
-# CC score
-bus$CC_score <- bus$CC - bus$ACC_mean_scaled
-
-# CC score based on literature
-bus$CC_score_2 <- bus$CC - bus$ACC_mean_scaled_2
-
 st_write(bus, "/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/Spatial/bus_sea_vis2.shp")
 st_write(bus_land, "/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/Spatial/bus_land_vis.shp")
 
 ##### Bootstrapping to compare means
 ## Note: variable/attribute names are modified slightly depending on how csvs automatically retitle variables (argh). You may have to revise these.
-## There are some weird discrepancies between when I first ran results and when I re-ran them using the above "bus_land" csv. Check on this.
 
 ##### Value (flood)
 
 # Create a lean dataset with only the variables of interest, taking the average flood score across all locations
 bus_land <- st_read("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/Spatial/bus_land_vis.shp")
 flood_bts <- bus_land %>% as.data.frame() %>% select(-geometry) %>% 
-  dplyr::group_by(Name,identty,tenure,indstr1,indstr_, outside, influnc, age, island, prox, revenue) %>% 
+  dplyr::group_by(Name,identty,tenure,indstr1,indstr_, outside, influnc, age, island, prox, revenue) %>% # This groups values associated with multiple locations of same business into same business "Name" and appends other identifying categories/variables of interest.
   summarize(fl_perc = mean(Q16_4),
             fl_v_10 = max(fl_v_10),
             fl_s_10 = mean(fl_s_10),
@@ -399,10 +359,10 @@ flood_bts <- bus_land %>% as.data.frame() %>% select(-geometry) %>%
             fl_s_100 = mean(fl_s_100),
             fl_s_500 = mean(fl_s_500))
 
-flood_bts$indstr1 <- ifelse(flood_bts$indstr1 == "Recreational surface","Recreation surface",flood_bts$indstr1)
+flood_bts$indstr1 <- ifelse(flood_bts$indstr1 == "Recreational surface","Recreation surface",flood_bts$indstr1) # Correct typo ("Recreational surface" and "Recreation surface" are the same category)
 
-# Bootstrap based on grouping variables of interest
-bt_sub <- flood_bts %>% filter((indstr1 == "Restaurant" | indstr1 == "Lodging") & !is.na(fl_s_10))
+# Bootstrap based on grouping variables of interest (model below for "Recreation surface" - can use for any category.
+bt_sub <- flood_bts %>% filter((indstr1 == "Recreation surface") & !is.na(fl_s_10))
 n = length(bt_sub$fl_s_10)
 B = 10000
 result = rep(NA, B)
@@ -411,12 +371,12 @@ for (i in 1:B) {
   result[i] = mean(bt_sub$fl_s_10[boot.sample])
 }
 with(bt_sub, mean(fl_s_10) + c(-1, 1) * 2 * sd(result))
-#-0.6688349  0.3525956
-mean(bt_sub$fl_s_10) #-0.1581197
+
+mean(bt_sub$fl_s_10)
 
 ##### Value (recreation)
 REC_bts <- bus %>% as.data.frame() %>% select(-geometry) %>% 
-  dplyr::group_by(Name,identity,tenure,industry1,industry_sub, outside, influence, age, island, prox, revenue, res) %>% 
+  dplyr::group_by(Name,identity,tenure,industry1,industry_sub, outside, influence, age, island, prox, revenue, res) %>% # This groups values associated with multiple locations of same business into same business "Name" and appends other identifying categories/variables of interest.
   summarize(rec_perc = mean(rec_perc, na.rm = TRUE),
             rec_score = mean(rec_score, na.rm = TRUE),
             rec_scaled = mean(rec_scaled, na.rm = TRUE),
@@ -425,8 +385,8 @@ REC_bts <- bus %>% as.data.frame() %>% select(-geometry) %>%
 
 REC_bts$industry1 <- ifelse(REC_bts$industry1 == "Recreational surface","Recreation surface",REC_bts$industry1)
 
-# Bootstrap based on grouping variables of interest
-bt_sub <- REC_bts %>% filter((industry1 == "Restaurant" | industry1 == "Lodging") & (!is.na(rec_score)))
+# Bootstrap based on grouping variables of interest (model below for "Recreation surface" - can use for any category.
+bt_sub <- REC_bts %>% filter((indstr1 == "Recreation surface") & (!is.na(rec_score)))
 n = length(bt_sub$rec_score)
 B = 10000
 result = rep(NA, B)
@@ -435,12 +395,13 @@ for (i in 1:B) {
   result[i] = mean(bt_sub$rec_score[boot.sample])
 }
 with(bt_sub, mean(rec_score) + c(-1, 1) * 2 * sd(result))
-#-0.6688349  0.3525956
-mean(bt_sub$rec_score) #-0.1581197
+
+mean(bt_sub$rec_score)
 
 ##### Coral health
 CC_bts <- bus %>% as.data.frame() %>% select(-geometry) %>% 
-  dplyr::group_by(Name,identity,tenure,industry1,industry_sub, outside, influence, age, island, prox, revenue, res) %>% 
+  dplyr::group_by(Name,identity,tenure,industry1,industry_sub, outside, influence, age, island, prox, revenue, res) %>% # This groups values associated with multiple locations of same business into same business "Name" and appends other identifying categories/variables of interest.
+  summarize(rec_perc = mean(rec_perc, na.rm = TRUE),
   summarize(CC = mean(CC),
             customer = mean(Q16_1),
             ACC_mean = mean(ACC_mean),
@@ -463,100 +424,6 @@ for (i in 1:B) {
   result[i] = mean(bt_sub$ACC_mean[boot.sample])
 }
 with(bt_sub, mean(ACC_mean) + c(-1, 1) * 2 * sd(result))
-#-0.6688349  0.3525956
-mean(bt_sub$ACC_mean) #-0.1581197
 
-###### Data summaries for manuscript
-
-# Basic script to vary with stat and dataset (whether bus - sea only for rec and CC - or bus_land - land locations for flood value)
-bus_stats <- bus %>% as.data.frame() %>% select(-geometry) %>% dplyr::group_by(Name) %>% summarize(mn = mean(ACC_mean_scaled_2))
-mean(bus_stats$mn, na.rm = TRUE) # -0.39
-sd(bus_stats$mn, na.rm = TRUE) # 1.22
-
-sum(bus_land$fl_val_10 == 1)
-
-####### Bootstrap plots for manuscript
-boot <- read.csv("/Users/rachelcarlson/Documents/Research/Coral_Insurance/Data/Figs_bootstrap.csv")
-boot$Group <- factor(boot$Group,levels = c("Coral cover", "On-reef industry", "Island","Industry","Coral value rec", "Coral value flood"))
-
-# Coral health
-ggplot(boot[1:6,], aes(x = Group2, y = Y_axis, fill = forcats::fct_rev(X_axis))) +
-  geom_bar(position = position_dodge(), stat = "identity",
-           colour = "black",
-           size = 0.3) +
-  geom_errorbar(aes(ymin = Y_axis-sd, ymax = Y_axis+sd), width =0.3, position = position_dodge(.9)) +
-  ylim(0,5) +
-  theme_classic() +
-  scale_fill_manual(values=c("#3B9AB2", "#E1AF00"))
-
-ggplot(boot[7:10,], aes(x = Group, y = Y_axis, fill = forcats::fct_rev(X_axis))) +
-  geom_bar(position = position_dodge(), stat = "identity",
-           colour = "black",
-           size = 0.3) +
-  geom_errorbar(aes(ymin = Y_axis-sd, ymax = Y_axis+sd), width =0.3, position = position_dodge(.9)) +
-  ylim(0,5) +
-  theme_classic() +
-  scale_fill_manual(values=c("#3B9AB2", "#E1AF00"))
-
-# Coral value to tourism/recreation
-ggplot(boot[15:16,], aes(x = Group, y = Y_axis, fill = forcats::fct_rev(X_axis))) +
-  geom_bar(position = position_dodge(), stat = "identity",
-           colour = "black",
-           size = 0.3) +
-  geom_errorbar(aes(ymin = Y_axis-sd, ymax = Y_axis+sd), width =0.3, position = position_dodge(.9)) +
-  ylim(0,5) +
-  theme_classic() +
-  scale_fill_manual(values=c("#3B9AB2", "#E1AF00"))
-  
-ggplot(boot[17:20,], aes(x = Group, y = Y_axis, fill = X_axis)) +
-  geom_bar(position = position_dodge(), stat = "identity",
-           colour = "black",
-           size = 0.3) +
-  geom_errorbar(aes(ymin = Y_axis-sd, ymax = Y_axis+sd), width =0.3, position = position_dodge(.9)) +
-  ylim(0,5) +
-  theme_classic() +
-  scale_fill_manual(values=Zissou2)
-
-ggplot(boot[21:24,], aes(x = Group, y = Y_axis, fill = X_axis)) +
-  geom_bar(position = position_dodge(), stat = "identity",
-           colour = "black",
-           size = 0.3) +
-  geom_errorbar(aes(ymin = Y_axis-sd, ymax = Y_axis+sd), width =0.3, position = position_dodge(.9)) +
-  ylim(-3,1) +
-  theme_classic() +
-  scale_fill_manual(values=Zissou2)
-
-# Coral value to flood protection
-
-ggplot(boot[25:26,], aes(x = Group, y = Y_axis, fill = forcats::fct_rev(X_axis))) +
-  geom_bar(position = position_dodge(), stat = "identity",
-           colour = "black",
-           size = 0.3) +
-  geom_errorbar(aes(ymin = Y_axis-sd, ymax = Y_axis+sd), width =0.3, position = position_dodge(.9)) +
-  ylim(0,5) +
-  theme_classic() +
-  scale_fill_manual(values=c("#3B9AB2", "#E1AF00"))
-
-ggplot(boot[27:30,], aes(x = Group, y = Y_axis, fill = X_axis)) +
-  geom_bar(position = position_dodge(), stat = "identity",
-           colour = "black",
-           size = 0.3) +
-  geom_errorbar(aes(ymin = Y_axis-sd, ymax = Y_axis+sd), width =0.3, position = position_dodge(.9)) +
-  ylim(0,5) +
-  theme_classic() +
-  scale_fill_manual(values=Zissou2)
-
-ggplot(boot[31:34,], aes(x = Group, y = Y_axis, fill = X_axis)) +
-  geom_bar(position = position_dodge(), stat = "identity",
-           colour = "black",
-           size = 0.3) +
-  geom_errorbar(aes(ymin = Y_axis-sd, ymax = Y_axis+sd), width =0.3, position = position_dodge(.9)) +
-  ylim(-3,1.5) +
-  theme_classic() +
-  scale_fill_manual(values=Zissou2)
-
-
-
-
-
+mean(bt_sub$ACC_mean)
 
